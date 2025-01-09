@@ -80,8 +80,10 @@ public record BotListing(
             }
             builder.intent(intent.asInt());
         } else if (intent.isTextual()) {
-            //throw if cant find
-            Intent intentEnum = Intent.valueOf(intent.asText());
+            Intent intentEnum = Intent.from(intent.asText());
+            if (intentEnum == null) {
+                throw new IllegalArgumentException("intent");
+            }
             builder.intent(intentEnum.intent());
         } else {
             throw new IllegalArgumentException("intent");
@@ -186,6 +188,15 @@ public record BotListing(
 
         public int intent() {
             return intent;
+        }
+
+        public static Intent from(String name) {
+            for (Intent value : values()) {
+                if (StringUtils.equalsIgnoreCase(value.name(), name)) {
+                    return value;
+                }
+            }
+            return null;
         }
 
         public static Intent from(int code) {
