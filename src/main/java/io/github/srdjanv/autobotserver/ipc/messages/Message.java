@@ -8,12 +8,12 @@ public record Message(
         String type,
         Object data
 ) {
-    public Message(MessageSendType type) {
+    public Message(IpcMessage type) {
         this(type, null);
     }
 
-    public Message(MessageSendType type, Object data) {
-        this(type.type(), data);
+    public Message(IpcMessage type, Object data) {
+        this(type.send(), data);
     }
 
     public Message(String type, Object data) {

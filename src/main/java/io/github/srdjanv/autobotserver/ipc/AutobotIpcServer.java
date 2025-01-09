@@ -2,9 +2,8 @@ package io.github.srdjanv.autobotserver.ipc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.srdjanv.autobotserver.Config;
+import io.github.srdjanv.autobotserver.ipc.messages.IpcMessage;
 import io.github.srdjanv.autobotserver.ipc.messages.Message;
-import io.github.srdjanv.autobotserver.ipc.messages.MessageResponseType;
-import io.github.srdjanv.autobotserver.ipc.messages.MessageSendType;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
@@ -63,8 +62,7 @@ public class AutobotIpcServer implements AutoCloseable {
                     try {
                         IpcBotHandler ipcBotHandler = new IpcBotHandler(config, mapper, sock);
                         BotInfo botInfo = ipcBotHandler.awaitParsedResponse(
-                                new Message(MessageSendType.Get_Info),
-                                MessageResponseType.Info,
+                                IpcMessage.Info,
                                 (objectMapper, node) -> objectMapper.treeToValue(node, BotInfo.class)
                         ).join();
                         registerBotHandler(botInfo, ipcBotHandler);
@@ -107,7 +105,8 @@ public class AutobotIpcServer implements AutoCloseable {
         }).toList();
     }
 
-    @Override public void close() throws Exception {
+    @Override
+    public void close() throws Exception {
         List<IpcBotHandler> list = new ArrayList<>(idBotHandlerMap.values());
         idBotHandlerMap.clear();
         for (IpcBotHandler value : list) {
@@ -115,5 +114,6 @@ public class AutobotIpcServer implements AutoCloseable {
         }
     }
 
-    public record Bot(long botId, IpcBotHandler handler) {}
+    public record Bot(long botId, IpcBotHandler handler) {
+    }
 }

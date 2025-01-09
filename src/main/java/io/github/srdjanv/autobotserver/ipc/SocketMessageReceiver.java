@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.srdjanv.autobotserver.Config;
+import io.github.srdjanv.autobotserver.ipc.messages.IpcMessage;
 import io.github.srdjanv.autobotserver.ipc.messages.MessageListener;
-import io.github.srdjanv.autobotserver.ipc.messages.MessageResponseType;
 import lombok.extern.slf4j.Slf4j;
 import org.newsclub.net.unix.AFUNIXSocket;
 
@@ -20,10 +20,10 @@ public class SocketMessageReceiver implements AutoCloseable {
     private final Config config;
     private final ObjectMapper mapper;
     public final BufferedReader in;
-    public final Map<MessageResponseType, Collection<MessageListener>> handlers;
+    public final Map<IpcMessage, Collection<MessageListener>> handlers;
     private final IpcBotHandler ipcBotHandler;
 
-    public SocketMessageReceiver(Config config, ObjectMapper mapper, AFUNIXSocket socket, Map<MessageResponseType, Collection<MessageListener>> handlers, IpcBotHandler ipcBotHandler) throws IOException {
+    public SocketMessageReceiver(Config config, ObjectMapper mapper, AFUNIXSocket socket, Map<IpcMessage, Collection<MessageListener>> handlers, IpcBotHandler ipcBotHandler) throws IOException {
         this.config = config;
         this.mapper = mapper;
         this.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -44,11 +44,12 @@ public class SocketMessageReceiver implements AutoCloseable {
         }
         String string = responses.stream().map(String::valueOf).collect(Collectors.joining());
         ObjectNode objectNode = (ObjectNode) mapper.readTree(string);
-        MessageResponseType responseType = MessageResponseType.fromString(objectNode.get("type").asText());
-        if (responseType == null) {
+        Optional<IpcMessage> optionalResponseType = IpcMessage.fromReceive(objectNode.get("type").asText());
+        if (optionalResponseType.isEmpty()) {
             log.warn("Received a message from client with unknown response type: {}", string);
             return;
         }
+        IpcMessage responseType = optionalResponseType.get();
         Collection<MessageListener> messageListeners = handlers.get(responseType);
         if (messageListeners == null) {
             log.warn("No listeners registered for response: {}", responseType);
@@ -74,7 +75,8 @@ public class SocketMessageReceiver implements AutoCloseable {
         }
     }
 
-    @Override public void close() throws Exception {
+    @Override
+    public void close() throws Exception {
         in.close();
     }
 }

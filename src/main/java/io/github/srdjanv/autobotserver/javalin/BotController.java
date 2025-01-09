@@ -12,6 +12,7 @@ import io.github.srdjanv.autobotserver.ipc.messages.*;
 import io.javalin.http.ContentType;
 import io.javalin.http.Context;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.time.Duration;
@@ -42,9 +43,7 @@ public class BotController {
                     if (botHandler == null) {
                         return CompletableFuture.failedFuture(new Exception("Bot handler not found"));
                     }
-                    return botHandler.awaitResponse(
-                            new Message(MessageSendType.Get_Pricelist),
-                            MessageResponseType.Pricelist);
+                    return botHandler.awaitResponse(IpcMessage.Pricelist);
                 });
         tradeListCache = Caffeine.newBuilder()
                 .expireAfterWrite(duration)
@@ -53,9 +52,7 @@ public class BotController {
                     if (botHandler == null) {
                         return CompletableFuture.failedFuture(new Exception("Bot handler not found"));
                     }
-                    return botHandler.awaitResponse(
-                            new Message(MessageSendType.Get_Trades),
-                            MessageResponseType.Trades);
+                    return botHandler.awaitResponse(IpcMessage.Trades);
                 });
 
         inventoryCache = Caffeine.newBuilder()
@@ -65,21 +62,19 @@ public class BotController {
                     if (botHandler == null) {
                         return CompletableFuture.failedFuture(new Exception("Bot handler not found"));
                     }
-                    return botHandler.awaitResponse(
-                            new Message(MessageSendType.Inventory),
-                            MessageResponseType.Inventory);
+                    return botHandler.awaitResponse(IpcMessage.Inventory);
                 });
 
         server.registerCallback((botId, handler) -> {
-            handler.registerListener(new MessageListener(MessageResponseType.Pricelist, (node, ipcBotHandler) -> {
+            handler.registerListener(IpcMessage.Pricelist, (node, ipcBotHandler) -> {
                 priceListCache.put(botId, CompletableFuture.completedFuture(node));
-            }));
-            handler.registerListener(new MessageListener(MessageResponseType.Trades, (node, ipcBotHandler) -> {
+            });
+            handler.registerListener(IpcMessage.Trades, (node, ipcBotHandler) -> {
                 tradeListCache.put(botId, CompletableFuture.completedFuture(node));
-            }));
-            handler.registerListener(new MessageListener(MessageResponseType.Inventory, (node, ipcBotHandler) -> {
+            });
+            handler.registerListener(IpcMessage.Inventory, (node, ipcBotHandler) -> {
                 inventoryCache.put(botId, CompletableFuture.completedFuture(node));
-            }));
+            });
         });
 
         mapper = new ObjectMapper();
@@ -114,10 +109,7 @@ public class BotController {
                 ctx.status(404);
                 return;
             }
-            CompletableFuture<JsonNode> response = handler.awaitResponse(
-                    new Message(MessageSendType.Remove_Item, sku),
-                    MessageResponseType.Item_Removed
-            );
+            CompletableFuture<JsonNode> response = handler.awaitResponse(IpcMessage.Item_Remove, sku);
             handleResponse(ctx, response);
         });
     }
@@ -129,10 +121,7 @@ public class BotController {
                 ctx.status(404);
                 return;
             }
-            CompletableFuture<JsonNode> response = handler.awaitResponse(
-                    new Message(MessageSendType.Update_Item, extractBotListing(ctx)),
-                    MessageResponseType.Item_Updated
-            );
+            CompletableFuture<JsonNode> response = handler.awaitResponse(IpcMessage.Item_Update, extractBotListing(ctx));
             handleResponse(ctx, response);
         });
     }
@@ -144,10 +133,7 @@ public class BotController {
                 ctx.status(404);
                 return;
             }
-            CompletableFuture<JsonNode> response = handler.awaitResponse(
-                    new Message(MessageSendType.Add_Item, extractBotListing(ctx)),
-                    MessageResponseType.Item_Added
-            );
+            CompletableFuture<JsonNode> response = handler.awaitResponse(IpcMessage.Item_Add, extractBotListing(ctx));
             handleResponse(ctx, response);
         });
     }
@@ -187,7 +173,7 @@ public class BotController {
                 })
                 .exceptionally(throwable -> {
                     ctx.status(500);
-                    ctx.json(throwable.getMessage());
+                    ctx.result(ExceptionUtils.getMessage(throwable));
                     return null;
                 }).join();
     }

@@ -21,7 +21,7 @@ public class IpcBotHandler implements AutoCloseable {
     private final Config config;
     private final AFUNIXSocket socket;
     private boolean closed = false;
-    private final Map<MessageResponseType, Collection<MessageListener>> reciverMap = new ConcurrentHashMap<>();
+    private final Map<IpcMessage, Collection<MessageListener>> reciverMap = new ConcurrentHashMap<>();
     private final Deque<Message> sendDeque = new ConcurrentLinkedDeque<>();
     private final ScheduledExecutorService receiverExecutor;
     private final SocketMessageReceiver receiver;
@@ -61,9 +61,17 @@ public class IpcBotHandler implements AutoCloseable {
         }, 0, 1500, TimeUnit.MILLISECONDS);
     }
 
-    public <T> CompletableFuture<T> awaitParsedResponse(Message message, MessageResponseType responseType, ResponseParser<T> parser) {
+    public <T> CompletableFuture<T> awaitParsedResponse(IpcMessage message, ResponseParser<T> parser) {
+        return awaitParsedResponse(new Message(message), parser);
+    }
+
+    public <T> CompletableFuture<T> awaitParsedResponse(IpcMessage message, Object data, ResponseParser<T> parser) {
+        return awaitParsedResponse(new Message(message, data), parser);
+    }
+
+    public <T> CompletableFuture<T> awaitParsedResponse(Message message, ResponseParser<T> parser) {
         return CompletableFuture.supplyAsync(() -> {
-            JsonNode node = awaitResponse(message, responseType).join();
+            JsonNode node = awaitResponse(message).join();
             try {
                 return parser.parse(mapper, node);
             } catch (JsonProcessingException e) {
@@ -72,10 +80,17 @@ public class IpcBotHandler implements AutoCloseable {
         });
     }
 
-    public CompletableFuture<JsonNode> awaitResponse(Message message, MessageResponseType responseType) {
+    public CompletableFuture<JsonNode> awaitResponse(IpcMessage message) {
+        return awaitResponse(new Message(message));
+    }
+    public CompletableFuture<JsonNode> awaitResponse(IpcMessage message, Object data) {
+        return awaitResponse(new Message(message, data));
+    }
+
+    public CompletableFuture<JsonNode> awaitResponse(Message message) {
         return CompletableFuture.supplyAsync(() -> {
             JsonNode[] data = new JsonNode[1];
-            send(message, responseType, (node, botHandler) -> {
+            send(message, (node, botHandler) -> {
                 data[0] = node;
             }).join();
             Awaitility.await()
@@ -86,11 +101,11 @@ public class IpcBotHandler implements AutoCloseable {
         });
     }
 
-    public void send(Message message) {
-        sendDeque.add(message);
-    }
-
-    public CompletableFuture<Void> send(Message message, MessageResponseType type, OnMessage onMessage) {
+    public CompletableFuture<Void> send(Message message, OnMessage onMessage) {
+        Optional<IpcMessage> ipcMessage = IpcMessage.fromSend(message.type());
+        if (ipcMessage.isEmpty() || ipcMessage.get().receive() == null) {
+            return CompletableFuture.failedFuture(new Exception("Invalid message type"));
+        }
         return CompletableFuture.runAsync(() -> {
             boolean[] finished = new boolean[1];
             OnMessage wrapped = (node, botHandler) -> {
@@ -100,7 +115,7 @@ public class IpcBotHandler implements AutoCloseable {
                     finished[0] = true;
                 }
             };
-            try (var ignore = registerListener(new MessageListener(type, wrapped))) {
+            try (var ignore = registerListener(new MessageListener(ipcMessage.get(), wrapped))) {
                 send(message);
                 Awaitility.await()
                         .failFast(() -> closed)
@@ -110,13 +125,22 @@ public class IpcBotHandler implements AutoCloseable {
         });
     }
 
+    public void send(Message message) {
+        sendDeque.add(message);
+    }
+
+
+    public MessageClosable registerListener(IpcMessage type, OnMessage listener) {
+        return registerListener(new MessageListener(type, listener));
+    }
     public MessageClosable registerListener(MessageListener messageListener) {
         Collection<MessageListener> listeners = reciverMap.computeIfAbsent(messageListener.type(), t -> new ConcurrentLinkedDeque<>());
         listeners.add(messageListener);
         return () -> listeners.remove(messageListener);
     }
 
-    @Override public void close() throws Exception {
+    @Override
+    public void close() throws Exception {
         List<ScheduledExecutorService> services = List.of(receiverExecutor, senderExecutor);
         services.forEach(ExecutorService::shutdown);
         for (ScheduledExecutorService service : services) {
