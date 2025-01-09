@@ -160,14 +160,14 @@ public class BotController {
         }
         IpcBotHandler botHandler = server.getBotHandler(name);
         if (botHandler == null) {
-            ctx.status(400);
+            ctx.status(404);
             ctx.result("Unable to find bot");
             return;
         }
 
         BotInfo info = botHandler.botInfo();
         if (info == null) {
-            ctx.status(400);
+            ctx.status(404);
             ctx.result("Unable to find bot");
             return;
         }
