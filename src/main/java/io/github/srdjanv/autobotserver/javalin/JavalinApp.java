@@ -3,7 +3,6 @@ package io.github.srdjanv.autobotserver.javalin;
 import io.github.srdjanv.autobotserver.ipc.AutobotIpcServer;
 import io.github.srdjanv.autobotserver.Config;
 import io.javalin.Javalin;
-import io.javalin.apibuilder.EndpointGroup;
 import io.javalin.community.ssl.SslPlugin;
 import lombok.Getter;
 import lombok.experimental.Accessors;
@@ -28,17 +27,14 @@ public class JavalinApp implements AutoCloseable {
         this.botController = new BotController(autobotIpcServer);
         this.config = config;
         this.auth = new Auth(config);
-        SslPlugin sslPlugin = new SslPlugin(conf -> {
-            Path cert = config.certificate().toAbsolutePath();
-            Path path = config.privateKey().toAbsolutePath();
-            String password = config.sslPassword();
-            conf.pemFromPath(cert.toString(), path.toString(), password);
 
-            conf.sniHostCheck = false;
-        });
+        int serverPort = config.serverPort();
+        String serverHost = config.serverHost();
 
         javalin = Javalin.create(javalinConfig -> {
-            javalinConfig.registerPlugin(sslPlugin);
+            if (config.useSsl()) {
+                javalinConfig.registerPlugin(buildSslPlugin(config));
+            }
             javalinConfig.router.mount(router -> {
                 router.beforeMatched(auth::handleAccess);
             }).apiBuilder(() -> {
@@ -63,11 +59,22 @@ public class JavalinApp implements AutoCloseable {
                     });
                 });
             });
-        }).start(config.serverPort());
-        log.info("JavalinApp started on port {}", config.serverPort());
+        }).start(serverHost, serverPort);
+        log.info("JavalinApp started {}:{}", serverHost, serverPort);
     }
 
-    @Override public void close() {
+    private SslPlugin buildSslPlugin(Config config) {
+        return new SslPlugin(conf -> {
+            Path cert = config.certificate().toAbsolutePath();
+            Path path = config.privateKey().toAbsolutePath();
+            String password = config.sslPassword();
+            conf.pemFromPath(cert.toString(), path.toString(), password);
+            conf.sniHostCheck = config.sniHostCheck();
+        });
+    }
+
+    @Override
+    public void close() {
         javalin.jettyServer().stop();
     }
 }

@@ -5,6 +5,7 @@ import com.electronwill.nightconfig.json.JsonFormat;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.nio.file.Path;
@@ -41,17 +42,31 @@ public class Config implements AutoCloseable {
         return fileConfig.getOrElse("ipc_message_timeout", 120);
     }
 
-
-    public String socketId() {
-        return fileConfig.getOrElse("socket_id", "autobot_gui");
+    public String socketPath() {
+        return fileConfig.getOrElse("socket_path", () -> {
+            Path tmp = Path.of(FileUtils.getTempDirectoryPath());
+            return tmp.resolve("app." + "autobot_gui").toAbsolutePath().toString();
+        });
     }
 
     public int serverPort() {
         return fileConfig.getOrElse("server_port", 443);
     }
 
+    public String serverHost() {
+        return fileConfig.getOrElse("server_host", "localHost");
+    }
+
+    public boolean sniHostCheck() {
+        return fileConfig.getOrElse("sni_host_check", false);
+    }
+
     public int responseCacheTimeout() {
         return fileConfig.getOrElse("response_cache_timeout", 10);
+    }
+
+    public boolean useAuth() {
+        return fileConfig.getOrElse("use_auth", true);
     }
 
     public String authToken() {
@@ -60,6 +75,10 @@ public class Config implements AutoCloseable {
             throw new IllegalArgumentException("Auth token is empty");
         }
         return Objects.requireNonNull(authToken, "No auth token provided");
+    }
+
+    public boolean useSsl() {
+        return fileConfig.getOrElse("use_ssl", true);
     }
 
     public String sslPassword() {
@@ -75,7 +94,8 @@ public class Config implements AutoCloseable {
         return path.resolve("key.pem");
     }
 
-    @Override public void close()  {
+    @Override
+    public void close() {
         fileConfig.save();
     }
 }

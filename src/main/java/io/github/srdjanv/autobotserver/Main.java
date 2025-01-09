@@ -13,14 +13,15 @@ public class Main {
 		AutobotIpcServer autobotIpcServer = new AutobotIpcServer(config);
 		JavalinApp javalinApp = new JavalinApp(autobotIpcServer, config);
 		autobotIpcServer.start();
-/*		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 			for (AutoCloseable closeable : List.of(javalinApp, autobotIpcServer, config)) {
                 try {
+					log.info("Closing {}", closeable);
                     closeable.close();
                 } catch (Exception e) {
                     log.error(e.getMessage(), e);
                 }
             }
-		}));*/
+		}));
 	}
 }

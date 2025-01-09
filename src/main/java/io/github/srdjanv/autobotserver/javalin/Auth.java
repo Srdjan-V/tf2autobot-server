@@ -16,6 +16,9 @@ public class Auth {
     }
 
     public void handleAccess(Context ctx) {
+        if (!config.useAuth()) {
+            return;
+        }
         var authToken = ctx.header(Header.AUTHORIZATION);
         if (StringUtils.equals(authToken, config.authToken())) {
             return;

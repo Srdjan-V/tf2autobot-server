@@ -6,8 +6,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.srdjanv.autobotserver.Config;
 import io.github.srdjanv.autobotserver.ipc.messages.MessageClosable;
 import io.github.srdjanv.autobotserver.ipc.messages.*;
+import lombok.Getter;
+import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.awaitility.Awaitility;
+import org.jetbrains.annotations.Nullable;
 import org.newsclub.net.unix.AFUNIXSocket;
 
 import java.io.*;
@@ -17,6 +21,12 @@ import java.util.concurrent.*;
 
 @Slf4j
 public class IpcBotHandler implements AutoCloseable {
+    @Nullable
+    @Getter
+    @Accessors(fluent = true)
+    //volatile is probably not needed
+    private volatile BotInfo botInfo;
+
     private final ObjectMapper mapper;
     private final Config config;
     private final AFUNIXSocket socket;
@@ -83,6 +93,7 @@ public class IpcBotHandler implements AutoCloseable {
     public CompletableFuture<JsonNode> awaitResponse(IpcMessage message) {
         return awaitResponse(new Message(message));
     }
+
     public CompletableFuture<JsonNode> awaitResponse(IpcMessage message, Object data) {
         return awaitResponse(new Message(message, data));
     }
@@ -129,27 +140,53 @@ public class IpcBotHandler implements AutoCloseable {
         sendDeque.add(message);
     }
 
-
     public MessageClosable registerListener(IpcMessage type, OnMessage listener) {
         return registerListener(new MessageListener(type, listener));
     }
+
     public MessageClosable registerListener(MessageListener messageListener) {
         Collection<MessageListener> listeners = reciverMap.computeIfAbsent(messageListener.type(), t -> new ConcurrentLinkedDeque<>());
         listeners.add(messageListener);
         return () -> listeners.remove(messageListener);
     }
 
+    public void initialize(BotInfo botInfo) {
+        if (this.botInfo == null) {
+            this.botInfo = botInfo;
+            receiver.initialize(botInfo);
+            sender.initialize(botInfo);
+            return;
+        }
+        log.warn("Bot already initialized, botInfo: {}", this.botInfo);
+    }
+
     @Override
     public void close() throws Exception {
+        log.info("Closing {}", this);
         List<ScheduledExecutorService> services = List.of(receiverExecutor, senderExecutor);
-        services.forEach(ExecutorService::shutdown);
+        for (ScheduledExecutorService scheduledExecutorService : services) {
+            log.info("Closing scheduled executor service: {}", scheduledExecutorService);
+            scheduledExecutorService.shutdown();
+        }
         for (ScheduledExecutorService service : services) {
-            service.awaitTermination(5, TimeUnit.SECONDS);
+            if (!service.awaitTermination(5, TimeUnit.SECONDS)) {
+                log.info("Timed out executing service {}", service);
+            }
         }
-        for (AutoCloseable closeable : List.of(receiver, sender)) {
-            closeable.close();
+        log.info("Closing socket");
+        try {
+            socket.close();
+        } catch (IOException e) {
+            log.error("Error closing socket", e);
         }
-        socket.close();
+        log.info("Finished closing {}", this);
         closed = true;
+    }
+
+    @Override
+    public String toString() {
+        return new ToStringBuilder(this)
+                .append("botInfo", botInfo)
+                .toString();
     }
 }

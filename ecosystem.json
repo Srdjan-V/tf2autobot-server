@@ -1,0 +1,18 @@
+{
+  "apps": [
+    {
+      "name": "AutobotServer",
+      "max_memory_restart": "1500M",
+      "kill_retry_time": 30000,
+      "kill_timeout": 60000,
+      "interpreter": "bash",
+      "cwd": ".",
+      "script": "gradlew",
+      "args": [
+        "run"
+      ],
+      "env": {
+      }
+    }
+  ]
+}

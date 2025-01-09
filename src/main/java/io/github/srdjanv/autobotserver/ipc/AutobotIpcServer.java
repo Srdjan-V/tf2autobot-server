@@ -3,10 +3,10 @@ package io.github.srdjanv.autobotserver.ipc;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.srdjanv.autobotserver.Config;
 import io.github.srdjanv.autobotserver.ipc.messages.IpcMessage;
-import io.github.srdjanv.autobotserver.ipc.messages.Message;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.newsclub.net.unix.AFUNIXServerSocket;
 import org.newsclub.net.unix.AFUNIXSocket;
 import org.newsclub.net.unix.AFUNIXSocketAddress;
@@ -14,6 +14,7 @@ import org.newsclub.net.unix.AFUNIXSocketAddress;
 import java.io.*;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -34,7 +35,7 @@ public class AutobotIpcServer implements AutoCloseable {
     }
 
     public void start() {
-        log.info("AutobotServer starting...");
+        log.info("AutobotIpcServer starting...");
         CompletableFuture.runAsync(() -> {
             try {
                 doStart();
@@ -46,7 +47,7 @@ public class AutobotIpcServer implements AutoCloseable {
     }
 
     private void doStart() throws IOException {
-        Path socketFile = Path.of(FileUtils.getTempDirectoryPath()).resolve("app." + config.socketId());
+        Path socketFile = Path.of(config.socketPath());
 
         try (AFUNIXServerSocket server = AFUNIXServerSocket.newInstance()) {
             server.setReuseAddress(false);
@@ -65,6 +66,7 @@ public class AutobotIpcServer implements AutoCloseable {
                                 IpcMessage.Info,
                                 (objectMapper, node) -> objectMapper.treeToValue(node, BotInfo.class)
                         ).join();
+                        ipcBotHandler.initialize(botInfo);
                         registerBotHandler(botInfo, ipcBotHandler);
                     } catch (Exception e) {
                         log.error(e.getMessage(), e);
@@ -99,10 +101,8 @@ public class AutobotIpcServer implements AutoCloseable {
         return idBotHandlerMap.get(id);
     }
 
-    public List<Bot> getAllBots() {
-        return idBotHandlerMap.entrySet().stream().map(entry -> {
-            return new Bot(entry.getKey(), entry.getValue());
-        }).toList();
+    public Map<Long, IpcBotHandler> getAllBots() {
+        return Collections.unmodifiableMap(idBotHandlerMap);
     }
 
     @Override
@@ -114,6 +114,10 @@ public class AutobotIpcServer implements AutoCloseable {
         }
     }
 
-    public record Bot(long botId, IpcBotHandler handler) {
+    @Override
+    public String toString() {
+        return new ToStringBuilder(this)
+                .append("bots", idBotHandlerMap)
+                .toString();
     }
 }
