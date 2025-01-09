@@ -5,6 +5,7 @@ import io.github.srdjanv.autobotserver.Config;
 import io.github.srdjanv.autobotserver.ipc.messages.Message;
 import io.github.srdjanv.autobotserver.ipc.messages.MessageResponseType;
 import io.github.srdjanv.autobotserver.ipc.messages.MessageSendType;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
 import org.newsclub.net.unix.AFUNIXServerSocket;
@@ -22,6 +23,7 @@ import java.util.function.BiConsumer;
 
 @Slf4j
 public class AutobotIpcServer implements AutoCloseable {
+    @Getter
     private final Config config;
     private final ObjectMapper mapper;
     private final Map<Long, IpcBotHandler> idBotHandlerMap = new ConcurrentHashMap<>();

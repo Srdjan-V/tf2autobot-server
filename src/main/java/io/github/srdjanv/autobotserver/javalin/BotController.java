@@ -33,8 +33,10 @@ public class BotController {
 
     public BotController(AutobotIpcServer server) {
         this.server = server;
+        int timeout = server.getConfig().responseCacheTimeout();
+        Duration duration = Duration.ofSeconds(timeout);
         priceListCache = Caffeine.newBuilder()
-                .expireAfterWrite(Duration.ofSeconds(10))
+                .expireAfterWrite(duration)
                 .buildAsync((key, executor) -> {
                     IpcBotHandler botHandler = server.getBotHandler(key);
                     if (botHandler == null) {
@@ -45,7 +47,7 @@ public class BotController {
                             MessageResponseType.Pricelist);
                 });
         tradeListCache = Caffeine.newBuilder()
-                .expireAfterWrite(Duration.ofSeconds(10))
+                .expireAfterWrite(duration)
                 .buildAsync((key, executor) -> {
                     IpcBotHandler botHandler = server.getBotHandler(key);
                     if (botHandler == null) {
@@ -57,7 +59,7 @@ public class BotController {
                 });
 
         inventoryCache = Caffeine.newBuilder()
-                .expireAfterWrite(Duration.ofSeconds(10))
+                .expireAfterWrite(duration)
                 .buildAsync((key, executor) -> {
                     IpcBotHandler botHandler = server.getBotHandler(key);
                     if (botHandler == null) {
@@ -190,6 +192,7 @@ public class BotController {
                 }).join();
     }
 
+    //todo fix
     private BotListing extractBotListing(Context ctx) {
         Map<String, String> ret = new HashMap<>();
         Map<String, List<String>> listMap = ctx.queryParamMap();

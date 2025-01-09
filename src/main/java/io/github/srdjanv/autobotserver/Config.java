@@ -5,6 +5,7 @@ import com.electronwill.nightconfig.json.JsonFormat;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 
 import java.nio.file.Path;
 import java.util.Objects;
@@ -49,8 +50,15 @@ public class Config implements AutoCloseable {
         return fileConfig.getOrElse("server_port", 443);
     }
 
+    public int responseCacheTimeout() {
+        return fileConfig.getOrElse("response_cache_timeout", 10);
+    }
+
     public String authToken() {
         String authToken = fileConfig.get("auth_token");
+        if (StringUtils.isBlank(authToken)) {
+            throw new IllegalArgumentException("Auth token is empty");
+        }
         return Objects.requireNonNull(authToken, "No auth token provided");
     }
 
