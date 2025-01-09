@@ -15,10 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.LongConsumer;
@@ -78,6 +75,17 @@ public class BotController {
 
         mapper = new ObjectMapper();
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    }
+
+    public void getBots(Context ctx) {
+        List<BotInfo> botInfos = new ArrayList<>();
+        for (IpcBotHandler botHandler : server.getAllBots().values()) {
+            BotInfo botInfo = botHandler.botInfo();
+            if (botInfo != null) {
+                botInfos.add(botInfo);
+            }
+        }
+        ctx.json(botInfos);
     }
 
     public void getPriceList(Context ctx) {

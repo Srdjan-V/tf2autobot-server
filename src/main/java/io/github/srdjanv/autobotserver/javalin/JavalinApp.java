@@ -1,16 +1,16 @@
 package io.github.srdjanv.autobotserver.javalin;
 
-import io.github.srdjanv.autobotserver.ipc.AutobotIpcServer;
 import io.github.srdjanv.autobotserver.Config;
+import io.github.srdjanv.autobotserver.ipc.AutobotIpcServer;
 import io.javalin.Javalin;
 import io.javalin.community.ssl.SslPlugin;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 
-import static io.javalin.apibuilder.ApiBuilder.*;
-
 import java.nio.file.Path;
+
+import static io.javalin.apibuilder.ApiBuilder.*;
 
 @Slf4j
 @Getter
@@ -39,6 +39,9 @@ public class JavalinApp implements AutoCloseable {
                 router.beforeMatched(auth::handleAccess);
             }).apiBuilder(() -> {
                 path("v1", () -> {
+                    path("bots", () -> {
+                        get(botController::getBots);
+                    });
                     path("price_list", () -> {
                         get(botController::getPriceList);
                     });
