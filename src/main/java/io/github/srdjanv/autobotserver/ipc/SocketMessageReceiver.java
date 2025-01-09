@@ -2,6 +2,7 @@ package io.github.srdjanv.autobotserver.ipc;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.srdjanv.autobotserver.Config;
 import io.github.srdjanv.autobotserver.ipc.messages.IpcMessage;
@@ -53,7 +54,7 @@ public class SocketMessageReceiver extends SocketMessage {
         JsonNode data = objectNode.get("data");
         if (data == null) {
             log.warn("BotId: {}, Received a message from client without data: {}", botId, string);
-            return;
+            data = NullNode.getInstance();
         }
         switch (responseType) {
             case Trades, Inventory, Pricelist -> {
