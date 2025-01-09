@@ -1,0 +1,42 @@
+plugins {
+    id 'java'
+    id 'application'
+    id("io.freefair.lombok") version "8.11"
+}
+
+group = 'io.github.srdjanv'
+version = '0.0.1'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+application {
+    mainClass = "io.github.srdjanv.autobotserver.Main"
+    applicationName = 'AutobotServer'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation("io.javalin:javalin-bundle:6.4.0") {
+        exclude group: 'ch.qos.logback', module: 'logback-classic'
+    }
+    implementation("org.awaitility:awaitility:4.2.2")
+    implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
+    implementation("io.javalin.community.ssl:ssl-plugin:6.4.0")
+    implementation("com.kohlschutter.junixsocket:junixsocket-core:2.10.1")
+    implementation("com.electronwill.night-config:json:3.8.1")
+    implementation("org.apache.commons:commons-lang3:3.17.0")
+    implementation("commons-io:commons-io:2.18.0")
+    implementation("org.apache.logging.log4j:log4j-slf4j2-impl:2.24.3")
+
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
