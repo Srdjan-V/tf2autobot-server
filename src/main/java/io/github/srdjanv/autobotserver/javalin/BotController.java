@@ -1,28 +1,26 @@
 package io.github.srdjanv.autobotserver.javalin;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.*;
-import com.github.benmanes.caffeine.cache.*;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.srdjanv.autobotserver.ipc.AutobotIpcServer;
 import io.github.srdjanv.autobotserver.ipc.IpcBotHandler;
-import io.github.srdjanv.autobotserver.ipc.messages.*;
-import io.javalin.http.ContentType;
+import io.github.srdjanv.autobotserver.ipc.messages.IpcMessage;
 import io.javalin.http.Context;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.LongConsumer;
-
-import static org.eclipse.jetty.http.MimeTypes.Type.APPLICATION_JSON;
 
 @Slf4j
 public class BotController {
@@ -121,8 +119,10 @@ public class BotController {
                 ctx.status(404);
                 return;
             }
-            CompletableFuture<JsonNode> response = handler.awaitResponse(IpcMessage.Item_Update, extractBotListing(ctx));
-            handleResponse(ctx, response);
+            extractBotListing(ctx).ifPresent(botListing -> {
+                CompletableFuture<JsonNode> response = handler.awaitResponse(IpcMessage.Item_Update, botListing);
+                handleResponse(ctx, response);
+            });
         });
     }
 
@@ -133,8 +133,10 @@ public class BotController {
                 ctx.status(404);
                 return;
             }
-            CompletableFuture<JsonNode> response = handler.awaitResponse(IpcMessage.Item_Add, extractBotListing(ctx));
-            handleResponse(ctx, response);
+            extractBotListing(ctx).ifPresent(botListing -> {
+                CompletableFuture<JsonNode> response = handler.awaitResponse(IpcMessage.Item_Add, botListing);
+                handleResponse(ctx, response);
+            });
         });
     }
 
@@ -173,13 +175,12 @@ public class BotController {
                 })
                 .exceptionally(throwable -> {
                     ctx.status(500);
-                    ctx.result(ExceptionUtils.getMessage(throwable));
+                    ctx.result(ExceptionUtils.getRootCauseMessage(throwable));
                     return null;
                 }).join();
     }
 
-    //todo fix
-    private BotListing extractBotListing(Context ctx) {
+    private Optional<BotListing> extractBotListing(Context ctx) {
         Map<String, String> ret = new HashMap<>();
         Map<String, List<String>> listMap = ctx.queryParamMap();
         listMap.forEach((k, v) -> {
@@ -188,76 +189,13 @@ public class BotController {
             }
             ret.put(k, v.getFirst());
         });
-        ret.remove("bot_id");
         ObjectNode listingNode = mapper.valueToTree(ret);
-        listingNode.putIfAbsent("enabled", BooleanNode.getTrue());
-        listingNode.putIfAbsent("min", IntNode.valueOf(0));
-        listingNode.putIfAbsent("max", IntNode.valueOf(1));
-
-        JsonNode intent = listingNode.get("intent");
-        if (intent == null) {
-            listingNode.set("intent", IntNode.valueOf(2));
-        } else if (intent.isTextual()) {
-            BotListing.Intent value = BotListing.Intent.valueOf(intent.asText());
-            if (value != null) {
-                listingNode.putIfAbsent("intent", IntNode.valueOf(value.intent()));
-            }
-        }
-
-        JsonNode buy = listingNode.get("buy");
-        if (buy == null) {
-            buy = listingNode.putObject("buy");
-        }
-        JsonNode sell = listingNode.get("sell");
-        if (sell == null) {
-            sell = listingNode.putObject("sell");
-        }
-
-        if (buy.isObject()) {
-            ((ObjectNode) buy).putIfAbsent("keys", IntNode.valueOf(0));
-            ((ObjectNode) buy).putIfAbsent("metal", IntNode.valueOf(0));
-
-            listingNode.putIfAbsent("autoprice", BooleanNode.getFalse());
-        } else if (!buy.isObject() && sell.isObject()) {
-            buy = listingNode.putObject("buy");
-
-            ((ObjectNode) buy).putIfAbsent("keys", IntNode.valueOf(0));
-            ((ObjectNode) buy).putIfAbsent("metal", IntNode.valueOf(0));
-        }
-
-        if (sell.isObject()) {
-            ((ObjectNode) sell).putIfAbsent("keys", IntNode.valueOf(0));
-            ((ObjectNode) sell).putIfAbsent("metal", IntNode.valueOf(0));
-
-            listingNode.putIfAbsent("autoprice", BooleanNode.getFalse());
-        } else if (!sell.isObject() && buy.isObject()) {
-            sell = listingNode.putObject("buy");
-
-            ((ObjectNode) sell).putIfAbsent("keys", IntNode.valueOf(0));
-            ((ObjectNode) sell).putIfAbsent("metal", IntNode.valueOf(0));
-        }
-
-        JsonNode note = listingNode.get("note");
-        if (note == null) {
-            // If note parameter is not defined, set both note.buy and note.sell to null.
-            note = listingNode.putObject("note");
-        }
-        if (note.isObject()) {
-            ((ObjectNode) note).putIfAbsent("buy", NullNode.getInstance());
-            ((ObjectNode) note).putIfAbsent("sell", NullNode.getInstance());
-        }
-
-        JsonNode group = listingNode.get("group");
-        if (group == null) {
-            listingNode.putIfAbsent("group", TextNode.valueOf("all"));
-        }
-
-        listingNode.putIfAbsent("autoprice", BooleanNode.getTrue());
-        listingNode.putIfAbsent("isPartialPriced", BooleanNode.getFalse());
         try {
-            return mapper.treeToValue(listingNode, BotListing.class);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            return Optional.ofNullable(BotListing.transform(listingNode));
+        } catch (IllegalArgumentException e) {
+            ctx.status(400);
+            ctx.result(ExceptionUtils.getRootCauseMessage(e));
+            return Optional.empty();
         }
     }
 }

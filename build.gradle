@@ -23,6 +23,10 @@ repositories {
 }
 
 dependencies {
+    implementation("org.jetbrains:annotations:26.0.1")
+    annotationProcessor("io.soabase.record-builder:record-builder-processor:44")
+    compileOnly("io.soabase.record-builder:record-builder-core:44")
+
     implementation("io.javalin:javalin-bundle:6.4.0") {
         exclude group: 'ch.qos.logback', module: 'logback-classic'
     }
