@@ -12,6 +12,7 @@ import io.github.srdjanv.autobotserver.ipc.IpcBotHandler;
 import io.github.srdjanv.autobotserver.ipc.messages.IpcMessage;
 import io.javalin.http.Context;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 
 import java.time.Duration;
@@ -200,6 +201,20 @@ public class BotController {
     private void handleResponse(Context ctx, CompletableFuture<JsonNode> response) {
         response
                 .thenAccept(node -> {
+                    if (node.isTextual()) {
+                        String botResponse = node.asText();
+                        if (StringUtils.isBlank(botResponse)) {
+                            //empty response, request error probably
+                            ctx.status(400);
+                            ctx.result("Bot returned empty response, probably invalid request");
+                            return;
+                        }
+                        if (StringUtils.contains(botResponse, "Error")) {
+                            ctx.status(400);
+                            ctx.result(botResponse);
+                            return;
+                        }
+                    }
                     ctx.json(node.toString());
                 })
                 .exceptionally(throwable -> {
