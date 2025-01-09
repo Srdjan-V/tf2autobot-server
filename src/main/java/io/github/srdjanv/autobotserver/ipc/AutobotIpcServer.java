@@ -87,7 +87,7 @@ public class AutobotIpcServer implements AutoCloseable {
             try {
                 put.close();
             } catch (Exception e) {
-                log.error("Error closing old ipc bot handler", e);
+                log.error("Error closing old {}", put, e);
             }
         }
         registerCallbacks.forEach(cb -> cb.accept(botId, handler));

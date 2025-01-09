@@ -4,8 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.srdjanv.autobotserver.Config;
 import io.github.srdjanv.autobotserver.ipc.messages.Message;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.jetbrains.annotations.Nullable;
 import org.newsclub.net.unix.AFUNIXSocket;
 
 import java.io.IOException;
@@ -14,16 +12,13 @@ import java.util.Deque;
 
 @Slf4j
 public class SocketMessageSender extends SocketMessage {
-    private final Config config;
-    private final ObjectMapper mapper;
-    public final PrintWriter out;
     public final Deque<Message> messages;
+    public final PrintWriter out;
 
-    public SocketMessageSender(Config config, ObjectMapper mapper, AFUNIXSocket socket, Deque<Message> messages) throws IOException {
-        this.config = config;
-        this.mapper = mapper;
-        this.out = new PrintWriter(socket.getOutputStream(), true);
+    public SocketMessageSender(IpcBotHandler ipcBotHandler, Config config, ObjectMapper mapper, AFUNIXSocket socket, Deque<Message> messages) throws IOException {
+        super(ipcBotHandler, config, mapper);
         this.messages = messages;
+        this.out = new PrintWriter(socket.getOutputStream(), true);
     }
 
     public void sendMessage() throws IOException {

@@ -7,8 +7,6 @@ import io.github.srdjanv.autobotserver.Config;
 import io.github.srdjanv.autobotserver.ipc.messages.IpcMessage;
 import io.github.srdjanv.autobotserver.ipc.messages.MessageListener;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.jetbrains.annotations.Nullable;
 import org.newsclub.net.unix.AFUNIXSocket;
 
 import java.io.BufferedReader;
@@ -19,18 +17,13 @@ import java.util.stream.Collectors;
 
 @Slf4j
 public class SocketMessageReceiver extends SocketMessage {
-    private final Config config;
-    private final ObjectMapper mapper;
-    public final BufferedReader in;
     public final Map<IpcMessage, Collection<MessageListener>> handlers;
-    private final IpcBotHandler ipcBotHandler;
+    public final BufferedReader in;
 
-    public SocketMessageReceiver(Config config, ObjectMapper mapper, AFUNIXSocket socket, Map<IpcMessage, Collection<MessageListener>> handlers, IpcBotHandler ipcBotHandler) throws IOException {
-        this.config = config;
-        this.mapper = mapper;
+    public SocketMessageReceiver(IpcBotHandler ipcBotHandler, Config config, ObjectMapper mapper, AFUNIXSocket socket, Map<IpcMessage, Collection<MessageListener>> handlers) throws IOException {
+        super(ipcBotHandler, config, mapper);
         this.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         this.handlers = handlers;
-        this.ipcBotHandler = ipcBotHandler;
     }
 
     public void readMessage() throws IOException {

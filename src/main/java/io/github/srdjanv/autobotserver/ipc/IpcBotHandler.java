@@ -51,7 +51,7 @@ public class IpcBotHandler implements AutoCloseable {
         int millis = config.ipcMessagePollInterval();
         log.info("Starting IpcBotHandler poll interval of {} millis", millis);
         receiverExecutor = Executors.newSingleThreadScheduledExecutor();
-        receiver = new SocketMessageReceiver(config, objectMapper, socket, reciverMap, this);
+        receiver = new SocketMessageReceiver(this, config, objectMapper, socket, reciverMap);
         receiverExecutor.scheduleAtFixedRate(() -> {
             try {
                 receiver.readMessage();
@@ -62,7 +62,7 @@ public class IpcBotHandler implements AutoCloseable {
         }, 0, millis, TimeUnit.MILLISECONDS);
 
         senderExecutor = Executors.newSingleThreadScheduledExecutor();
-        sender = new SocketMessageSender(config, objectMapper, socket, sendDeque);
+        sender = new SocketMessageSender(this, config, objectMapper, socket, sendDeque);
         senderExecutor.scheduleAtFixedRate(() -> {
             try {
                 sender.sendMessage();
