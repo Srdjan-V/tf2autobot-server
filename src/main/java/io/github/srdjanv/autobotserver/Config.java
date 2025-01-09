@@ -19,7 +19,7 @@ public class Config implements AutoCloseable {
     private final FileConfig fileConfig;
 
     public Config() {
-        this(Path.of(System.getProperty("user.dir")));
+        this(Path.of(System.getProperty("user.dir")).resolve("config"));
     }
 
     public Config(Path path) {

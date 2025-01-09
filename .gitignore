@@ -36,7 +36,5 @@ out/
 ### VS Code ###
 .vscode/
 
-/key.pem
-/cert.pem
-/server_config.json
+/config
 /target
