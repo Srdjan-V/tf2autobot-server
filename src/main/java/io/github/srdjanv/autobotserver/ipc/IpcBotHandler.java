@@ -48,6 +48,8 @@ public class IpcBotHandler implements AutoCloseable {
             throw new IOException("Peer closed socket right after connecting");
         }
 
+        int millis = config.ipcMessagePollInterval();
+        log.info("Starting IpcBotHandler poll interval of {} millis", millis);
         receiverExecutor = Executors.newSingleThreadScheduledExecutor();
         receiver = new SocketMessageReceiver(config, objectMapper, socket, reciverMap, this);
         receiverExecutor.scheduleAtFixedRate(() -> {
@@ -57,7 +59,7 @@ public class IpcBotHandler implements AutoCloseable {
                 log.error("Error reading message", e);
                 throw new RuntimeException(e);
             }
-        }, 0, 1500, TimeUnit.MILLISECONDS);
+        }, 0, millis, TimeUnit.MILLISECONDS);
 
         senderExecutor = Executors.newSingleThreadScheduledExecutor();
         sender = new SocketMessageSender(config, objectMapper, socket, sendDeque);
@@ -68,7 +70,7 @@ public class IpcBotHandler implements AutoCloseable {
                 log.error("Error sending message", e);
                 throw new RuntimeException(e);
             }
-        }, 0, 1500, TimeUnit.MILLISECONDS);
+        }, 0, millis, TimeUnit.MILLISECONDS);
     }
 
     public <T> CompletableFuture<T> awaitParsedResponse(IpcMessage message, ResponseParser<T> parser) {
