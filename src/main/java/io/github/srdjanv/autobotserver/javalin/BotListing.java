@@ -138,7 +138,7 @@ public record BotListing(
             if (metalNode.isDouble()) {
                 metal = metalNode.asDouble();
             } else if (metalNode.isTextual()) {
-                metal = Integer.parseInt(metalNode.asText());
+                metal = Double.parseDouble(metalNode.asText());
             } else {
                 throw new IllegalArgumentException("metal");
             }
