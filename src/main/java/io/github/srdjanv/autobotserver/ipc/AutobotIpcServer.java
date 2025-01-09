@@ -4,14 +4,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.srdjanv.autobotserver.Config;
 import io.github.srdjanv.autobotserver.ipc.messages.IpcMessage;
 import lombok.Getter;
+import lombok.Synchronized;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.newsclub.net.unix.AFUNIXServerSocket;
 import org.newsclub.net.unix.AFUNIXSocket;
 import org.newsclub.net.unix.AFUNIXSocketAddress;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -79,6 +81,7 @@ public class AutobotIpcServer implements AutoCloseable {
         }
     }
 
+    @Synchronized
     private void registerBotHandler(BotInfo info, IpcBotHandler handler) {
         log.info("Registered bot: {}", info);
         long botId = Long.parseUnsignedLong(info.id());
@@ -99,6 +102,20 @@ public class AutobotIpcServer implements AutoCloseable {
 
     public IpcBotHandler getBotHandler(long id) {
         return idBotHandlerMap.get(id);
+    }
+
+    public IpcBotHandler getBotHandler(String name) {
+        return idBotHandlerMap.values()
+                .stream()
+                .filter(ipcBotHandler -> {
+                    BotInfo info = ipcBotHandler.botInfo();
+                    if (info == null) {
+                        return false;
+                    }
+                    return StringUtils.equals(info.name(), name);
+                })
+                .findFirst()
+                .orElse(null);
     }
 
     public Map<Long, IpcBotHandler> getAllBots() {

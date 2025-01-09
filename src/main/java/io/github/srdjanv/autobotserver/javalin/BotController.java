@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.srdjanv.autobotserver.ipc.AutobotIpcServer;
+import io.github.srdjanv.autobotserver.ipc.BotInfo;
 import io.github.srdjanv.autobotserver.ipc.IpcBotHandler;
 import io.github.srdjanv.autobotserver.ipc.messages.IpcMessage;
 import io.javalin.http.Context;
@@ -102,58 +103,68 @@ public class BotController {
 
     public void removeItem(Context ctx) {
         getBotHandler(ctx, handler -> {
-            String sku = ctx.queryParam("sku");
-            if (sku == null) {
-                ctx.status(404);
-                return;
-            }
-            CompletableFuture<JsonNode> response = handler.awaitResponse(IpcMessage.Item_Remove, sku);
-            handleResponse(ctx, response);
+            getSku(ctx, sku -> {
+                CompletableFuture<JsonNode> response = handler.awaitResponse(IpcMessage.Item_Remove, sku);
+                handleResponse(ctx, response);
+            });
         });
     }
 
     public void updateItem(Context ctx) {
         getBotHandler(ctx, handler -> {
-            String sku = ctx.queryParam("sku");
-            if (sku == null) {
-                ctx.status(404);
-                return;
-            }
-            extractBotListing(ctx).ifPresent(botListing -> {
-                CompletableFuture<JsonNode> response = handler.awaitResponse(IpcMessage.Item_Update, botListing);
-                handleResponse(ctx, response);
+            getSku(ctx, sku -> {
+                extractBotListing(ctx).ifPresent(botListing -> {
+                    CompletableFuture<JsonNode> response = handler.awaitResponse(IpcMessage.Item_Update, botListing);
+                    handleResponse(ctx, response);
+                });
             });
         });
     }
 
     public void addItem(Context ctx) {
         getBotHandler(ctx, handler -> {
-            String sku = ctx.queryParam("sku");
-            if (sku == null) {
-                ctx.status(404);
-                return;
-            }
-            extractBotListing(ctx).ifPresent(botListing -> {
-                CompletableFuture<JsonNode> response = handler.awaitResponse(IpcMessage.Item_Add, botListing);
-                handleResponse(ctx, response);
+            getSku(ctx, sku -> {
+                extractBotListing(ctx).ifPresent(botListing -> {
+                    CompletableFuture<JsonNode> response = handler.awaitResponse(IpcMessage.Item_Add, botListing);
+                    handleResponse(ctx, response);
+                });
             });
         });
     }
 
     private void getBotId(Context ctx, LongConsumer onValid) {
+        String name = ctx.queryParam("bot_name");
         String id = ctx.queryParam("bot_id");
-        if (id == null) {
+        if (id == null && name == null) {
             ctx.status(400);
-            ctx.result("bot_id is required");
+            ctx.result("bot_id or name is required");
             return;
         }
-        try {
-            long parsed = Long.parseUnsignedLong(id);
-            onValid.accept(parsed);
-        } catch (NumberFormatException e) {
-            ctx.status(400);
-            ctx.result("bot_id is not a number");
+        if (id != null) {
+            try {
+                long parsed = Long.parseUnsignedLong(id);
+                onValid.accept(parsed);
+            } catch (NumberFormatException e) {
+                ctx.status(400);
+                ctx.result("bot_id is not a number");
+            }
+            return;
         }
+        IpcBotHandler botHandler = server.getBotHandler(name);
+        if (botHandler == null) {
+            ctx.status(400);
+            ctx.result("Unable to find bot");
+            return;
+        }
+
+        BotInfo info = botHandler.botInfo();
+        if (info == null) {
+            ctx.status(400);
+            ctx.result("Unable to find bot");
+            return;
+        }
+        long parsed = Long.parseUnsignedLong(info.id());
+        onValid.accept(parsed);
     }
 
     private void getBotHandler(Context ctx, Consumer<IpcBotHandler> onValid) {
@@ -166,6 +177,16 @@ public class BotController {
             }
             onValid.accept(botHandler);
         });
+    }
+
+    private void getSku(Context ctx, Consumer<String> onValid) {
+        String sku = ctx.queryParam("sku");
+        if (sku == null) {
+            ctx.status(404);
+            ctx.result("Missing sku");
+            return;
+        }
+        onValid.accept(sku);
     }
 
     private void handleResponse(Context ctx, CompletableFuture<JsonNode> response) {
