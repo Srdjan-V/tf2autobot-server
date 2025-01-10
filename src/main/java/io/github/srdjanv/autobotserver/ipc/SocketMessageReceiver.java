@@ -57,7 +57,7 @@ public class SocketMessageReceiver extends SocketMessage {
             data = NullNode.getInstance();
         }
         switch (responseType) {
-            case Trades, Inventory, Pricelist -> {
+            case Trades, Inventory, UserInventory, Pricelist -> {
                 log.info("BotId: {}, Received message from {}", botId, responseType);
             }
             default -> {

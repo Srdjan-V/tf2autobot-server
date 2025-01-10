@@ -17,7 +17,8 @@ public enum IpcMessage {
     Item_Remove("removeItem", "itemRemoved"),
     Item_Update("updateItem", "itemUpdated"),
     Item_Add("addItem", "itemAdded"),
-    Inventory("getInventory", "inventory");
+    Inventory("getInventory", "inventory"),
+    UserInventory("getUserInventory", "userInventory");
 
     @NotNull
     private final String send;

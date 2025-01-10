@@ -15,10 +15,7 @@ import org.newsclub.net.unix.AFUNIXSocketAddress;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
@@ -29,7 +26,7 @@ public class AutobotIpcServer implements AutoCloseable {
     private final Config config;
     private final ObjectMapper mapper;
     private final Map<Long, IpcBotHandler> idBotHandlerMap = new ConcurrentHashMap<>();
-    private final List<BiConsumer<Long, IpcBotHandler>> registerCallbacks = new ArrayList<>();
+    private final List<BiConsumer<Long, IpcBotHandler>> ipcRegisterCallbacks = new ArrayList<>();
 
     public AutobotIpcServer(Config config) {
         this.config = config;
@@ -86,25 +83,38 @@ public class AutobotIpcServer implements AutoCloseable {
         log.info("Registered bot: {}", info);
         long botId = Long.parseUnsignedLong(info.id());
         IpcBotHandler put = idBotHandlerMap.put(botId, handler);
-        if (put != null) {
-            try {
-                put.close();
-            } catch (Exception e) {
-                log.error("Error closing old {}", put, e);
-            }
+        closeHandler(put);
+        ipcRegisterCallbacks.forEach(cb -> cb.accept(botId, handler));
+    }
+
+    private void closeHandler(IpcBotHandler handler) {
+        if (handler == null) {
+            return;
         }
-        registerCallbacks.forEach(cb -> cb.accept(botId, handler));
+        try {
+            handler.close();
+        } catch (Exception e) {
+            log.error("Error closing {}", handler, e);
+        }
     }
 
     public void registerCallback(BiConsumer<Long, IpcBotHandler> cb) {
-        registerCallbacks.add(cb);
+        ipcRegisterCallbacks.add(cb);
     }
 
-    public IpcBotHandler getBotHandler(long id) {
-        return idBotHandlerMap.get(id);
+    public Optional<IpcBotHandler> getBotHandler(long id) {
+        IpcBotHandler handler = idBotHandlerMap.get(id);
+        if (handler == null) {
+            return Optional.empty();
+        }
+        if (handler.isOpen()) {
+            return Optional.of(handler);
+        }
+        closeHandler(handler);
+        return Optional.empty();
     }
 
-    public IpcBotHandler getBotHandler(String name) {
+    public Optional<IpcBotHandler> getBotHandler(String name) {
         return idBotHandlerMap.values()
                 .stream()
                 .filter(ipcBotHandler -> {
@@ -114,8 +124,13 @@ public class AutobotIpcServer implements AutoCloseable {
                     }
                     return StringUtils.equals(info.name(), name);
                 })
-                .findFirst()
-                .orElse(null);
+                .map(handler -> {
+                    long id = Long.parseUnsignedLong(handler.botInfo().id());
+                    return getBotHandler(id);
+                })
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst();
     }
 
     public Map<Long, IpcBotHandler> getAllBots() {
@@ -123,11 +138,11 @@ public class AutobotIpcServer implements AutoCloseable {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() {
         List<IpcBotHandler> list = new ArrayList<>(idBotHandlerMap.values());
         idBotHandlerMap.clear();
         for (IpcBotHandler value : list) {
-            value.close();
+            closeHandler(value);
         }
     }
 

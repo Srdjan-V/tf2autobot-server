@@ -28,6 +28,7 @@ public class BotController {
     private final AsyncLoadingCache<Long, JsonNode> priceListCache;
     private final AsyncLoadingCache<Long, JsonNode> tradeListCache;
     private final AsyncLoadingCache<Long, JsonNode> inventoryCache;
+    private final AsyncLoadingCache<UserInvReqKey, JsonNode> userInventoryCache;
 
     public BotController(AutobotIpcServer server) {
         this.server = server;
@@ -36,30 +37,40 @@ public class BotController {
         priceListCache = Caffeine.newBuilder()
                 .expireAfterWrite(duration)
                 .buildAsync((key, executor) -> {
-                    IpcBotHandler botHandler = server.getBotHandler(key);
-                    if (botHandler == null) {
+                    Optional<IpcBotHandler> botHandler = server.getBotHandler(key);
+                    if (botHandler.isEmpty()) {
                         return CompletableFuture.failedFuture(new Exception("Bot handler not found"));
                     }
-                    return botHandler.awaitResponse(IpcMessage.Pricelist);
+                    return botHandler.get().awaitResponse(IpcMessage.Pricelist);
                 });
         tradeListCache = Caffeine.newBuilder()
                 .expireAfterWrite(duration)
                 .buildAsync((key, executor) -> {
-                    IpcBotHandler botHandler = server.getBotHandler(key);
-                    if (botHandler == null) {
+                    Optional<IpcBotHandler> botHandler = server.getBotHandler(key);
+                    if (botHandler.isEmpty()) {
                         return CompletableFuture.failedFuture(new Exception("Bot handler not found"));
                     }
-                    return botHandler.awaitResponse(IpcMessage.Trades);
+                    return botHandler.get().awaitResponse(IpcMessage.Trades);
                 });
 
         inventoryCache = Caffeine.newBuilder()
                 .expireAfterWrite(duration)
                 .buildAsync((key, executor) -> {
-                    IpcBotHandler botHandler = server.getBotHandler(key);
-                    if (botHandler == null) {
+                    Optional<IpcBotHandler> botHandler = server.getBotHandler(key);
+                    if (botHandler.isEmpty()) {
                         return CompletableFuture.failedFuture(new Exception("Bot handler not found"));
                     }
-                    return botHandler.awaitResponse(IpcMessage.Inventory);
+                    return botHandler.get().awaitResponse(IpcMessage.Inventory);
+                });
+
+        userInventoryCache = Caffeine.newBuilder()
+                .expireAfterWrite(duration)
+                .buildAsync((key, executor) -> {
+                    Optional<IpcBotHandler> botHandler = server.getBotHandler(key.bot());
+                    if (botHandler.isEmpty()) {
+                        return CompletableFuture.failedFuture(new Exception("Bot handler not found"));
+                    }
+                    return botHandler.get().awaitResponse(IpcMessage.UserInventory, Long.toUnsignedString(key.user()));
                 });
 
         server.registerCallback((botId, handler) -> {
@@ -106,6 +117,32 @@ public class BotController {
     public void getInventory(Context ctx) {
         getBotId(ctx, botId -> {
             CompletableFuture<JsonNode> future = inventoryCache.get(botId);
+            handleResponse(ctx, future);
+        });
+    }
+
+    record UserInvReqKey(long bot, long user) {
+    }
+
+    public void getUserInventory(Context ctx) {
+        getBotId(ctx, botId -> {
+            String user = ctx.queryParam("user");
+            if (user == null) {
+                handleResponse(ctx, CompletableFuture.failedFuture(new IllegalArgumentException("User not specified")));
+                return;
+            }
+            long userId;
+            try {
+                userId = Long.parseUnsignedLong(user);
+            } catch (NumberFormatException ex) {
+                handleResponse(ctx, CompletableFuture.failedFuture(ex));
+                return;
+            }
+            if (botId == userId) {
+                handleResponse(ctx, CompletableFuture.failedFuture(new IllegalArgumentException("User matches bot id")));
+                return;
+            }
+            CompletableFuture<JsonNode> future = userInventoryCache.get(new UserInvReqKey(botId, userId));
             handleResponse(ctx, future);
         });
     }
@@ -159,14 +196,14 @@ public class BotController {
             }
             return;
         }
-        IpcBotHandler botHandler = server.getBotHandler(name);
-        if (botHandler == null) {
+        Optional<IpcBotHandler> botHandler = server.getBotHandler(name);
+        if (botHandler.isEmpty()) {
             ctx.status(404);
             ctx.result("Unable to find bot");
             return;
         }
 
-        BotInfo info = botHandler.botInfo();
+        BotInfo info = botHandler.get().botInfo();
         if (info == null) {
             ctx.status(404);
             ctx.result("Unable to find bot");
@@ -178,13 +215,13 @@ public class BotController {
 
     private void getBotHandler(Context ctx, Consumer<IpcBotHandler> onValid) {
         getBotId(ctx, botId -> {
-            IpcBotHandler botHandler = server.getBotHandler(botId);
-            if (botHandler == null) {
+            Optional<IpcBotHandler> botHandler = server.getBotHandler(botId);
+            if (botHandler.isEmpty()) {
                 ctx.status(404);
                 ctx.result("Unable to find bot");
                 return;
             }
-            onValid.accept(botHandler);
+            onValid.accept(botHandler.get());
         });
     }
 
@@ -206,10 +243,11 @@ public class BotController {
                         if (StringUtils.isBlank(botResponse)) {
                             //empty response, request error probably
                             ctx.status(400);
-                            ctx.result("Bot returned empty response, probably invalid request");
+                            ctx.result("Bot returned empty error response, probably invalid request");
                             return;
                         }
-                        if (StringUtils.contains(botResponse, "Error")) {
+                        //custom bot version version has 'Error:' prefix
+                        if (StringUtils.startsWith(botResponse, "Error:")) {
                             ctx.status(400);
                             ctx.result(botResponse);
                             return;

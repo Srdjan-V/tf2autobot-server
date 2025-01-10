@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.srdjanv.autobotserver.Config;
-import io.github.srdjanv.autobotserver.ipc.messages.MessageClosable;
 import io.github.srdjanv.autobotserver.ipc.messages.*;
 import lombok.Getter;
 import lombok.experimental.Accessors;
@@ -14,7 +13,7 @@ import org.awaitility.Awaitility;
 import org.jetbrains.annotations.Nullable;
 import org.newsclub.net.unix.AFUNIXSocket;
 
-import java.io.*;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
@@ -160,6 +159,10 @@ public class IpcBotHandler implements AutoCloseable {
             return;
         }
         log.warn("Bot already initialized, botInfo: {}", this.botInfo);
+    }
+
+    public boolean isOpen() {
+        return !socket.isClosed() && socket.isBound() && socket.isConnected();
     }
 
     @Override

@@ -60,6 +60,9 @@ public class JavalinApp implements AutoCloseable {
                     path("inventory", () -> {
                         get(botController::getInventory);
                     });
+                    path("user_inventory", () -> {
+                        get(botController::getUserInventory);
+                    });
                 });
             });
         }).start(serverHost, serverPort);
