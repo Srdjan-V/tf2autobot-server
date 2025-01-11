@@ -7,6 +7,7 @@ import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 
 import java.nio.file.Path;
 import java.util.Objects;
@@ -100,6 +101,13 @@ public class Config implements AutoCloseable {
 
     public Path privateKey() {
         return path.resolve("key.pem");
+    }
+
+    @Override
+    public String toString() {
+        return new ToStringBuilder(this)
+                .append("path", path)
+                .toString();
     }
 
     @Override

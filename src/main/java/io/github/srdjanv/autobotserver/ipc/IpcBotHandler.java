@@ -32,10 +32,13 @@ public class IpcBotHandler implements AutoCloseable {
     private boolean closed = false;
     private final Map<IpcMessage, Collection<MessageListener>> reciverMap = new ConcurrentHashMap<>();
     private final Deque<Message> sendDeque = new ConcurrentLinkedDeque<>();
+
     private final ScheduledExecutorService receiverExecutor;
+    private final ScheduledFuture<?> receiverScheduledFuture;
     private final SocketMessageReceiver receiver;
 
     private final ScheduledExecutorService senderExecutor;
+    private final ScheduledFuture<?> senderScheduledFuture;
     private final SocketMessageSender sender;
 
     public IpcBotHandler(Config config, ObjectMapper objectMapper, AFUNIXSocket socket) throws IOException {
@@ -51,7 +54,7 @@ public class IpcBotHandler implements AutoCloseable {
         log.info("Starting IpcBotHandler poll interval of {} millis", millis);
         receiverExecutor = Executors.newSingleThreadScheduledExecutor();
         receiver = new SocketMessageReceiver(this, config, objectMapper, socket, reciverMap);
-        receiverExecutor.scheduleAtFixedRate(() -> {
+        receiverScheduledFuture = receiverExecutor.scheduleAtFixedRate(() -> {
             try {
                 receiver.readMessage();
             } catch (Throwable e) {
@@ -62,7 +65,7 @@ public class IpcBotHandler implements AutoCloseable {
 
         senderExecutor = Executors.newSingleThreadScheduledExecutor();
         sender = new SocketMessageSender(this, config, objectMapper, socket, sendDeque);
-        senderExecutor.scheduleAtFixedRate(() -> {
+        senderScheduledFuture = senderExecutor.scheduleAtFixedRate(() -> {
             try {
                 sender.sendMessage();
             } catch (Throwable e) {
@@ -162,7 +165,30 @@ public class IpcBotHandler implements AutoCloseable {
     }
 
     public boolean isOpen() {
-        return !socket.isClosed() && socket.isBound() && socket.isConnected();
+        boolean socketOk = !socket.isClosed() && socket.isBound() && socket.isConnected();
+        boolean executorsOk = !receiverExecutor.isShutdown() && !senderExecutor.isShutdown();
+        boolean ipcComOk = !receiverScheduledFuture.isDone() && !senderScheduledFuture.isDone();
+        if (socketOk && executorsOk && ipcComOk) {
+            return true;
+        }
+        BotInfo botInfo = this.botInfo;
+        String botId;
+        if (botInfo != null) {
+            botId = botInfo.id();
+        } else {
+            botId = "UNKNOWN";
+        }
+
+        if (!socketOk) {
+            log.error("BotId {}, socket error", botId);
+        }
+        if (!executorsOk) {
+            log.error("BotId {}, executors error", botId);
+        }
+        if (!ipcComOk) {
+            log.error("BotId {}, ipc communication error", botId);
+        }
+        return false;
     }
 
     @Override
