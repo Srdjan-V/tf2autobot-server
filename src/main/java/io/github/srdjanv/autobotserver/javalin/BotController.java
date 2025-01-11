@@ -25,6 +25,7 @@ import java.util.function.LongConsumer;
 public class BotController {
     private final ObjectMapper mapper;
     private final AutobotIpcServer server;
+    private final AsyncLoadingCache<Long, JsonNode> keyPricesCache;
     private final AsyncLoadingCache<Long, JsonNode> priceListCache;
     private final AsyncLoadingCache<Long, JsonNode> tradeListCache;
     private final AsyncLoadingCache<Long, JsonNode> inventoryCache;
@@ -34,6 +35,16 @@ public class BotController {
         this.server = server;
         int timeout = server.getConfig().responseCacheTimeout();
         Duration duration = Duration.ofSeconds(timeout);
+
+        keyPricesCache = Caffeine.newBuilder()
+                .expireAfterWrite(duration)
+                .buildAsync((key, executor) -> {
+                    Optional<IpcBotHandler> botHandler = server.getBotHandler(key);
+                    if (botHandler.isEmpty()) {
+                        return CompletableFuture.failedFuture(new Exception("Bot handler not found"));
+                    }
+                    return botHandler.get().awaitResponse(IpcMessage.KeyPrice);
+                });
         priceListCache = Caffeine.newBuilder()
                 .expireAfterWrite(duration)
                 .buildAsync((key, executor) -> {
@@ -98,6 +109,13 @@ public class BotController {
             }
         }
         ctx.json(botInfos);
+    }
+
+    public void getKeyPrices(Context ctx) {
+        getBotId(ctx, botId -> {
+            CompletableFuture<JsonNode> future = keyPricesCache.get(botId);
+            handleResponse(ctx, future);
+        });
     }
 
     public void getPriceList(Context ctx) {

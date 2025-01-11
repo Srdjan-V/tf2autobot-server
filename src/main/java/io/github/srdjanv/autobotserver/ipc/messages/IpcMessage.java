@@ -12,6 +12,7 @@ import java.util.Optional;
 @Accessors(fluent = true)
 public enum IpcMessage {
     Info("getInfo", "info"),
+    KeyPrice("getKeyPrices", "keyPrices"),
     Pricelist("getPricelist", "pricelist"),
     Trades("getTrades", "polldata"),
     Item_Remove("removeItem", "itemRemoved"),
