@@ -8,16 +8,15 @@ import lombok.Synchronized;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.jetbrains.annotations.Nullable;
 import org.newsclub.net.unix.AFUNIXServerSocket;
 import org.newsclub.net.unix.AFUNIXSocket;
 import org.newsclub.net.unix.AFUNIXSocketAddress;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 import java.util.function.BiConsumer;
 
 @Slf4j
@@ -27,6 +26,8 @@ public class AutobotIpcServer implements AutoCloseable {
     private final ObjectMapper mapper;
     private final Map<Long, IpcBotHandler> idBotHandlerMap = new ConcurrentHashMap<>();
     private final List<BiConsumer<Long, IpcBotHandler>> ipcRegisterCallbacks = new ArrayList<>();
+    private final ScheduledExecutorService socketScheduler = Executors.newSingleThreadScheduledExecutor(
+            Thread.ofPlatform().name("Socket listener").factory());
 
     public AutobotIpcServer(Config config) {
         this.config = config;
@@ -35,17 +36,17 @@ public class AutobotIpcServer implements AutoCloseable {
 
     public void start() {
         log.info("AutobotIpcServer starting...");
-        CompletableFuture.runAsync(() -> {
+        final int seconds = config.ipcSocketAutoRestart();
+        socketScheduler.scheduleAtFixedRate(() -> {
             try {
-                doStart();
-            } catch (IOException e) {
-                log.error("AutobotServer start failed", e);
-                throw new UncheckedIOException(e);
+                listenerForClients();
+            } catch (Throwable e) {
+                log.error("AutobotServer socket listener error, retrying in {} seconds", seconds, e);
             }
-        });
+        }, 2, seconds, TimeUnit.SECONDS);
     }
 
-    private void doStart() throws IOException {
+    private void listenerForClients() throws IOException {
         Path socketFile = Path.of(config.socketPath());
 
         try (AFUNIXServerSocket server = AFUNIXServerSocket.newInstance()) {
@@ -58,13 +59,13 @@ public class AutobotIpcServer implements AutoCloseable {
                 log.info("Waiting for connection...");
 
                 AFUNIXSocket sock = server.accept();
+                log.info("Client connected: {}", sock);
                 CompletableFuture.runAsync(() -> {
                     try {
                         IpcBotHandler ipcBotHandler = new IpcBotHandler(config, mapper, sock);
-                        BotInfo botInfo = ipcBotHandler.awaitParsedResponse(
-                                IpcMessage.Info,
-                                (objectMapper, node) -> objectMapper.treeToValue(node, BotInfo.class)
-                        ).join();
+                        BotInfo botInfo = ipcBotHandler.awaitParsedResponse(IpcMessage.Info, (objectMapper, node) -> {
+                            return objectMapper.treeToValue(node, BotInfo.class);
+                        }).join();
                         ipcBotHandler.initialize(botInfo);
                         registerBotHandler(botInfo, ipcBotHandler);
                     } catch (Exception e) {
@@ -117,16 +118,17 @@ public class AutobotIpcServer implements AutoCloseable {
     public Optional<IpcBotHandler> getBotHandler(String name) {
         return idBotHandlerMap.values()
                 .stream()
-                .filter(ipcBotHandler -> {
-                    BotInfo info = ipcBotHandler.botInfo();
-                    if (info == null) {
-                        return false;
-                    }
-                    return StringUtils.equals(info.name(), name);
-                })
                 .map(handler -> {
-                    long id = Long.parseUnsignedLong(handler.botInfo().id());
-                    return getBotHandler(id);
+                    BotInfo info = handler.botInfo();
+                    if (info == null) {
+                        return Optional.<IpcBotHandler>empty();
+                    }
+                    if (!StringUtils.equals(info.name(), name)) {
+                        return Optional.<IpcBotHandler>empty();
+                    }
+                    long id = Long.parseUnsignedLong(info.id());
+                    //used to ensure the handler is open
+                    return this.getBotHandler(id);
                 })
                 .filter(Optional::isPresent)
                 .map(Optional::get)
@@ -143,6 +145,11 @@ public class AutobotIpcServer implements AutoCloseable {
         idBotHandlerMap.clear();
         for (IpcBotHandler value : list) {
             closeHandler(value);
+        }
+        try {
+            socketScheduler.shutdown();
+            socketScheduler.awaitTermination(20, TimeUnit.SECONDS);
+        } catch (InterruptedException ignored) {
         }
     }
 

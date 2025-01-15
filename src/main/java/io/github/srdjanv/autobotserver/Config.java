@@ -46,6 +46,10 @@ public class Config implements AutoCloseable {
         return fileConfig.getOrElse("ipc_message_poll_interval", 1000);
     }
 
+    public int ipcSocketAutoRestart() {
+        return fileConfig.getOrElse("ipc_socket_auto_restart", 15);
+    }
+
     public String socketPath() {
         return fileConfig.getOrElse("socket_path", () -> {
             Path tmp = Path.of(FileUtils.getTempDirectoryPath());
