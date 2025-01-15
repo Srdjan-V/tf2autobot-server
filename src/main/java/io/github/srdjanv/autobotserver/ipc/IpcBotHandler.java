@@ -141,6 +141,10 @@ public class IpcBotHandler implements AutoCloseable {
         });
     }
 
+    public void send(IpcMessage message) {
+        sendDeque.add(new Message(message));
+    }
+
     public void send(Message message) {
         sendDeque.add(message);
     }

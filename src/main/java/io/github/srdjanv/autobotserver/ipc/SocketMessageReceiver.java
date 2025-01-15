@@ -13,7 +13,10 @@ import org.newsclub.net.unix.AFUNIXSocket;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -40,33 +43,34 @@ public class SocketMessageReceiver extends SocketMessage {
         }
         String string = responses.stream().map(String::valueOf).collect(Collectors.joining());
         ObjectNode objectNode = (ObjectNode) mapper.readTree(string);
-        Optional<IpcMessage> optionalResponseType = IpcMessage.fromReceive(objectNode.get("type").asText());
-        if (optionalResponseType.isEmpty()) {
+        List<IpcMessage> ipcMessageList = IpcMessage.fromReceive(objectNode.get("type").asText());
+        if (ipcMessageList.isEmpty()) {
             log.warn("BotId: {}, Received a message from client with unknown response type: {}", botId, string);
             return;
         }
-        IpcMessage responseType = optionalResponseType.get();
-        Collection<MessageListener> messageListeners = handlers.get(responseType);
-        if (messageListeners == null) {
-            log.warn("BotId: {}, No listeners registered for response: {}", botId, responseType);
-            return;
-        }
-        JsonNode data = objectNode.get("data");
-        if (data == null) {
-            log.warn("BotId: {}, Received a message from client without data: {}", botId, string);
-            data = NullNode.getInstance();
-        }
-        switch (responseType) {
-            case Trades, Inventory, UserInventory, Pricelist -> {
-                log.info("BotId: {}, Received message from {}", botId, responseType);
+        for (IpcMessage responseType : ipcMessageList) {
+            Collection<MessageListener> messageListeners = handlers.get(responseType);
+            if (messageListeners == null) {
+                log.info("BotId: {}, No listeners registered for response: {}", botId, responseType);
+                continue;
             }
-            default -> {
-                log.info("BotId: {}, Received message from {}, data: {}", botId, responseType, data);
+            JsonNode data = objectNode.get("data");
+            if (data == null) {
+                log.warn("BotId: {}, Received a message from client without data: {}", botId, string);
+                data = NullNode.getInstance();
             }
-        }
-        for (MessageListener listener : messageListeners) {
-            if (listener.listener() != null) {
-                listener.listener().onMessage(data, ipcBotHandler);
+            switch (responseType) {
+                case Trades, Inventory, UserInventory, Pricelist -> {
+                    log.info("BotId: {}, Received message from {}", botId, responseType);
+                }
+                default -> {
+                    log.info("BotId: {}, Received message from {}, data: {}", botId, responseType, data);
+                }
+            }
+            for (MessageListener listener : messageListeners) {
+                if (listener.listener() != null) {
+                    listener.listener().onMessage(data, ipcBotHandler);
+                }
             }
         }
     }

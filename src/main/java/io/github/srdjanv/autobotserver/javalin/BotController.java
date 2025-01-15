@@ -13,6 +13,8 @@ import io.github.srdjanv.autobotserver.ipc.IpcBotHandler;
 import io.github.srdjanv.autobotserver.ipc.messages.IpcMessage;
 import io.javalin.http.Context;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.BooleanUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 
 import java.time.Duration;
@@ -115,6 +117,32 @@ public class BotController {
             return response;
         });
         handleResponse(ctx, data);
+    }
+
+    public void haltBot(Context ctx) {
+        getBotHandler(ctx, handler -> {
+            String halt = ctx.queryParam("halt");
+            if (StringUtils.isBlank(halt)) {
+                ctx.status(400);
+                ctx.result("Invalid halt parameter");
+                return;
+            }
+            Boolean boolHalt = BooleanUtils.toBooleanObject(halt);
+            if (boolHalt == null) {
+                ctx.status(400);
+                ctx.result("Invalid halt parameter");
+                return;
+            }
+            CompletableFuture<JsonNode> response = handler.awaitResponse(IpcMessage.Halt, boolHalt);
+            handleResponse(ctx, response);
+        });
+    }
+
+    public void haltStatus(Context ctx) {
+        getBotHandler(ctx, handler -> {
+            CompletableFuture<JsonNode> response = handler.awaitResponse(IpcMessage.HaltStatus);
+            handleResponse(ctx, response);
+        });
     }
 
     public void getKeyPrices(Context ctx) {

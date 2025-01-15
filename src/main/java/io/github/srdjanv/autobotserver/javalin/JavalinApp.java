@@ -42,7 +42,10 @@ public class JavalinApp implements AutoCloseable {
                     path("bots", () -> {
                         get(botController::getBots);
                     });
-                    //custom tf2automatic version only
+                    path("halt", () -> {
+                        post(botController::haltBot);
+                        get(botController::haltStatus);
+                    });
                     path("key_prices", () -> {
                         get(botController::getKeyPrices);
                     });
@@ -64,7 +67,6 @@ public class JavalinApp implements AutoCloseable {
                     path("inventory", () -> {
                         get(botController::getInventory);
                     });
-                    //custom tf2automatic version only
                     path("user_inventory", () -> {
                         get(botController::getUserInventory);
                     });

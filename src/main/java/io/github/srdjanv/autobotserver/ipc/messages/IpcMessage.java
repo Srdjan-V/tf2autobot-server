@@ -6,6 +6,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 @Getter
@@ -19,7 +21,9 @@ public enum IpcMessage {
     Item_Update("updateItem", "itemUpdated"),
     Item_Add("addItem", "itemAdded"),
     Inventory("getInventory", "inventory"),
-    UserInventory("getUserInventory", "userInventory");
+    UserInventory("getUserInventory", "userInventory"),
+    Halt("haltBot", "haltStatus"),
+    HaltStatus("getHaltStatus", "haltStatus");
 
     @NotNull
     private final String send;
@@ -42,14 +46,13 @@ public enum IpcMessage {
         return Optional.ofNullable(result);
     }
 
-    public static Optional<IpcMessage> fromReceive(String type) {
-        IpcMessage result = null;
+    public static List<IpcMessage> fromReceive(String type) {
+        List<IpcMessage> result = new ArrayList<>();
         for (IpcMessage ipcMessage : values()) {
             if (StringUtils.equals(ipcMessage.receive, type)) {
-                result = ipcMessage;
-                break;
+                result.add(ipcMessage);
             }
         }
-        return Optional.ofNullable(result);
+        return result;
     }
 }
