@@ -141,11 +141,11 @@ public class IpcBotHandler implements AutoCloseable {
         sendDeque.add(message);
     }
 
-    public MessageClosable registerListener(IpcMessage type, OnMessage listener) {
+    public MessageCloseable registerListener(IpcMessage type, OnMessage listener) {
         return registerListener(new MessageListener(type, listener));
     }
 
-    public MessageClosable registerListener(MessageListener messageListener) {
+    public MessageCloseable registerListener(MessageListener messageListener) {
         Collection<MessageListener> listeners = reciverMap.computeIfAbsent(messageListener.type(), t -> new ConcurrentLinkedDeque<>());
         listeners.add(messageListener);
         return () -> listeners.remove(messageListener);
