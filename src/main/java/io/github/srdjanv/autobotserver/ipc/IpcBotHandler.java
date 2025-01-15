@@ -10,6 +10,7 @@ import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.awaitility.Awaitility;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.newsclub.net.unix.AFUNIXSocket;
 
@@ -154,7 +155,7 @@ public class IpcBotHandler implements AutoCloseable {
         return () -> listeners.remove(messageListener);
     }
 
-    public void initialize(BotInfo botInfo) {
+    public void initialize(@NotNull BotInfo botInfo) {
         if (this.botInfo == null) {
             this.botInfo = botInfo;
             receiver.initialize(botInfo);

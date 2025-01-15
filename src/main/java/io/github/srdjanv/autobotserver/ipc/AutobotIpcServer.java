@@ -1,6 +1,8 @@
 package io.github.srdjanv.autobotserver.ipc;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.BooleanNode;
 import io.github.srdjanv.autobotserver.Config;
 import io.github.srdjanv.autobotserver.ipc.messages.IpcMessage;
 import lombok.Getter;
@@ -64,9 +66,18 @@ public class AutobotIpcServer implements AutoCloseable {
                     try {
                         IpcBotHandler ipcBotHandler = new IpcBotHandler(config, mapper, sock);
                         BotInfo botInfo = ipcBotHandler.awaitParsedResponse(IpcMessage.Info, (objectMapper, node) -> {
-                            return objectMapper.treeToValue(node, BotInfo.class);
+                            JsonNode success = Objects.requireNonNullElse(node.get("success"), BooleanNode.getFalse());
+                            if (!success.isBoolean() || !success.asBoolean()) {
+                                log.error("Not successful {} for {}", node, ipcBotHandler);
+                                return null;
+                            }
+                            JsonNode data = Objects.requireNonNullElse(node.get("data"), BooleanNode.getFalse());
+                            if (!data.isObject()) {
+                                log.error("Invalid data {} for {}", node, ipcBotHandler);
+                                return null;
+                            }
+                            return objectMapper.treeToValue(data, BotInfo.class);
                         }).join();
-                        ipcBotHandler.initialize(botInfo);
                         registerBotHandler(botInfo, ipcBotHandler);
                     } catch (Exception e) {
                         log.error(e.getMessage(), e);
@@ -80,8 +91,14 @@ public class AutobotIpcServer implements AutoCloseable {
     }
 
     @Synchronized
-    private void registerBotHandler(BotInfo info, IpcBotHandler handler) {
+    private void registerBotHandler(@Nullable BotInfo info, IpcBotHandler handler) {
+        if (info == null) {
+            log.error("BotInfo resolve ws not successful");
+            closeHandler(handler);
+            return;
+        }
         log.info("Registered bot: {}", info);
+        handler.initialize(info);
         long botId = Long.parseUnsignedLong(info.id());
         IpcBotHandler put = idBotHandlerMap.put(botId, handler);
         closeHandler(put);

@@ -3,6 +3,7 @@ package io.github.srdjanv.autobotserver.javalin;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.BooleanNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -12,7 +13,6 @@ import io.github.srdjanv.autobotserver.ipc.IpcBotHandler;
 import io.github.srdjanv.autobotserver.ipc.messages.IpcMessage;
 import io.javalin.http.Context;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 
 import java.time.Duration;
@@ -101,14 +101,20 @@ public class BotController {
     }
 
     public void getBots(Context ctx) {
-        List<BotInfo> botInfos = new ArrayList<>();
-        for (IpcBotHandler botHandler : server.getAllBots().values()) {
-            BotInfo botInfo = botHandler.botInfo();
-            if (botInfo != null) {
-                botInfos.add(botInfo);
+        CompletableFuture<JsonNode> data = CompletableFuture.supplyAsync(() -> {
+            List<BotInfo> botInfos = new ArrayList<>();
+            for (IpcBotHandler botHandler : server.getAllBots().values()) {
+                BotInfo botInfo = botHandler.botInfo();
+                if (botInfo != null) {
+                    botInfos.add(botInfo);
+                }
             }
-        }
-        ctx.json(botInfos);
+            ObjectNode response = mapper.createObjectNode();
+            response.put("success", true);
+            response.set("data", mapper.valueToTree(botInfos));
+            return response;
+        });
+        handleResponse(ctx, data);
     }
 
     public void getKeyPrices(Context ctx) {
@@ -254,30 +260,21 @@ public class BotController {
     }
 
     private void handleResponse(Context ctx, CompletableFuture<JsonNode> response) {
-        response
-                .thenAccept(node -> {
-                    if (node.isTextual()) {
-                        String botResponse = node.asText();
-                        if (StringUtils.isBlank(botResponse)) {
-                            //empty response, request error probably
-                            ctx.status(400);
-                            ctx.result("Bot returned empty error response, probably invalid request");
-                            return;
-                        }
-                        //custom bot version version has 'Error:' prefix
-                        if (StringUtils.startsWith(botResponse, "Error:")) {
-                            ctx.status(400);
-                            ctx.result(botResponse);
-                            return;
-                        }
-                    }
-                    ctx.json(node.toString());
-                })
-                .exceptionally(throwable -> {
-                    ctx.status(500);
-                    ctx.result(ExceptionUtils.getRootCauseMessage(throwable));
-                    return null;
-                }).join();
+        response.thenAccept(node -> {
+            JsonNode success = Objects.requireNonNullElse(node.get("success"), BooleanNode.getFalse());
+            if (!success.isBoolean() || !success.asBoolean()) {
+                ctx.status(400);
+            }
+            ctx.json(node.toString());
+        }).exceptionally(throwable -> {
+            ObjectNode errorResponse = mapper.createObjectNode();
+            errorResponse.put("success", Boolean.FALSE);
+            errorResponse.put("data", ExceptionUtils.getRootCauseMessage(throwable));
+
+            ctx.status(500);
+            ctx.json(errorResponse.toString());
+            return null;
+        }).join();
     }
 
     private Optional<BotListing> extractBotListing(Context ctx) {
