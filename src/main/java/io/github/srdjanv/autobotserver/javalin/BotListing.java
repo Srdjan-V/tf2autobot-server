@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.*;
 import io.soabase.recordbuilder.core.RecordBuilder;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 
 @RecordBuilder
@@ -46,11 +47,11 @@ public record BotListing(
         if (enabled.isBoolean()) {
             builder.enabled(enabled.asBoolean());
         } else if (enabled.isTextual()) {
-            switch (enabled.asText()) {
-                case "true" -> builder.enabled(true);
-                case "false" -> builder.enabled(false);
-                default -> throw new IllegalArgumentException("enabled");
+            Boolean enabledObj = BooleanUtils.toBooleanObject(enabled.asText());
+            if (enabledObj == null) {
+                throw new IllegalArgumentException("enabled");
             }
+            builder.enabled(enabledObj);
         } else {
             throw new IllegalArgumentException("enabled");
         }
@@ -93,11 +94,11 @@ public record BotListing(
         if (autoprice.isBoolean()) {
             builder.autoprice(autoprice.asBoolean());
         } else if (autoprice.isTextual()) {
-            switch (autoprice.asText()) {
-                case "true" -> builder.autoprice(true);
-                case "false" -> builder.autoprice(false);
-                default -> throw new IllegalArgumentException("autoprice");
+            Boolean autopriceObj = BooleanUtils.toBooleanObject(autoprice.asText());
+            if (autopriceObj == null) {
+                throw new IllegalArgumentException("autoprice");
             }
+            builder.autoprice(autopriceObj);
         } else {
             throw new IllegalArgumentException("autoprice");
         }
