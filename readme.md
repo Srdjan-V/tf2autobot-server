@@ -1,12 +1,13 @@
 ## AutobotServer
 
 An api server for [Tf2Autobot's](https://github.com/TF2Autobot/tf2autobot).
-Currently limited to linux, Node-Ipc has no support for unix sockets on windows and Junixsocket has no support for
-Windows pipes. But Windows has suport for unix sockets
+Currently limited to linux, `Node-Ipc` has no support for unix sockets on windows and `Junixsocket` has no support for
+Windows pipes.
+But Windows has support for unix sockets
 
 ### Config
 
-All configurations options can be found
+All configuration options can be found
 in [Config.java](https://github.com/Srdjan-V/tf2autobot-server/blob/master/src/main/java/io/github/srdjanv/autobotserver/Config.java)
 
 Pem files and `server_config.json` should be placed in ./config
@@ -17,8 +18,8 @@ Pem files gen [link](https://javalin.io/tutorials/javalin-ssl-tutorial#generatin
 
 ```json
 {
-	"ssl_password": "",
-	"auth_token": ""
+  "ssl_password": "",
+  "auth_token": ""
 }
 ```
 
@@ -26,14 +27,14 @@ Pem files gen [link](https://javalin.io/tutorials/javalin-ssl-tutorial#generatin
 
 ```json
 {
-	"use_ssl": false,
-	"use_auth": false
+  "use_ssl": false,
+  "use_auth": false
 }
 ```
 
 ### Api endpoints
 
-All configurations options can be found
+All endpoints can be found
 in [JavalinApp.java](https://github.com/Srdjan-V/tf2autobot-server/blob/master/src/main/java/io/github/srdjanv/autobotserver/javalin/JavalinApp.java)
 
 #### V1
