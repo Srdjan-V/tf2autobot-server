@@ -123,14 +123,12 @@ public class BotController {
         getBotHandler(ctx, handler -> {
             String halt = ctx.queryParam("halt");
             if (StringUtils.isBlank(halt)) {
-                ctx.status(400);
-                ctx.result("Invalid halt parameter");
+                error(ctx, 400, "Invalid halt parameter");
                 return;
             }
             Boolean boolHalt = BooleanUtils.toBooleanObject(halt);
             if (boolHalt == null) {
-                ctx.status(400);
-                ctx.result("Invalid halt parameter");
+                error(ctx, 400, "Invalid halt parameter");
                 return;
             }
             CompletableFuture<JsonNode> response = handler.awaitResponse(IpcMessage.Halt, boolHalt);
@@ -234,8 +232,7 @@ public class BotController {
         String name = ctx.queryParam("bot_name");
         String id = ctx.queryParam("bot_id");
         if (id == null && name == null) {
-            ctx.status(400);
-            ctx.result("bot_id or name is required");
+            error(ctx, 400, "bot_id or name is required");
             return;
         }
         if (id != null) {
@@ -243,22 +240,19 @@ public class BotController {
                 long parsed = Long.parseUnsignedLong(id);
                 onValid.accept(parsed);
             } catch (NumberFormatException e) {
-                ctx.status(400);
-                ctx.result("bot_id is not a number");
+                error(ctx, 400, "bot_id is not a number");
             }
             return;
         }
         Optional<IpcBotHandler> botHandler = server.getBotHandler(name);
         if (botHandler.isEmpty()) {
-            ctx.status(404);
-            ctx.result("Unable to find bot");
+            error(ctx, 404, "Unable to find bot");
             return;
         }
 
         BotInfo info = botHandler.get().botInfo();
         if (info == null) {
-            ctx.status(404);
-            ctx.result("Unable to find bot");
+            error(ctx, 404, "Unable to find bot");
             return;
         }
         long parsed = Long.parseUnsignedLong(info.id());
@@ -269,8 +263,7 @@ public class BotController {
         getBotId(ctx, botId -> {
             Optional<IpcBotHandler> botHandler = server.getBotHandler(botId);
             if (botHandler.isEmpty()) {
-                ctx.status(404);
-                ctx.result("Unable to find bot");
+                error(ctx, 404, "Unable to find bot");
                 return;
             }
             onValid.accept(botHandler.get());
@@ -295,12 +288,7 @@ public class BotController {
             }
             ctx.json(node.toString());
         }).exceptionally(throwable -> {
-            ObjectNode errorResponse = mapper.createObjectNode();
-            errorResponse.put("success", Boolean.FALSE);
-            errorResponse.put("data", ExceptionUtils.getRootCauseMessage(throwable));
-
-            ctx.status(500);
-            ctx.json(errorResponse.toString());
+            error(ctx, 500, ExceptionUtils.getRootCauseMessage(throwable));
             return null;
         }).join();
     }
@@ -318,13 +306,17 @@ public class BotController {
         try {
             return Optional.ofNullable(BotListing.transform(listingNode));
         } catch (IllegalArgumentException e) {
-            ctx.status(400);
-            ObjectNode errorNode = mapper.createObjectNode();
-            errorNode.put("success", Boolean.FALSE);
-            errorNode.put("data", ExceptionUtils.getRootCauseMessage(e));
-
-            ctx.json(errorNode.toString());
+            error(ctx, 400, ExceptionUtils.getRootCauseMessage(e));
             return Optional.empty();
         }
+    }
+
+    private void error(Context ctx, int code, String error) {
+        ObjectNode errorNode = mapper.createObjectNode();
+        errorNode.put("success", Boolean.FALSE);
+        errorNode.put("data", error);
+
+        ctx.status(code);
+        ctx.json(errorNode.toString());
     }
 }
