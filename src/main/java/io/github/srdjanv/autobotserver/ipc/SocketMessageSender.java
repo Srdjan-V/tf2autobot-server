@@ -11,18 +11,18 @@ import java.io.PrintWriter;
 import java.util.Deque;
 
 @Slf4j
-public class SocketMessageSender extends SocketMessage {
+public class SocketMessageSender extends AbstractSocketChannel {
     public final Deque<Message> messages;
     public final PrintWriter out;
 
     public SocketMessageSender(IpcBotHandler ipcBotHandler, Config config, ObjectMapper mapper, AFUNIXSocket socket, Deque<Message> messages) throws IOException {
         super(ipcBotHandler, config, mapper);
         this.messages = messages;
-        this.out = new PrintWriter(socket.getOutputStream(), true);
+        this.out = new PrintWriter(socket.getOutputStream(), false);
     }
 
     public void sendMessage() throws IOException {
-        char delimiter = config.messageDelimiter();
+        final char delimiter = config.messageDelimiter();
         Message poll = messages.poll();
         if (poll == null) {
             return;

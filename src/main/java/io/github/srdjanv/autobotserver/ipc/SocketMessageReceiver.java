@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
-public class SocketMessageReceiver extends SocketMessage {
+public class SocketMessageReceiver extends AbstractSocketChannel {
     public final Map<IpcMessage, Collection<MessageListener>> handlers;
     public final BufferedReader in;
 
@@ -31,21 +31,34 @@ public class SocketMessageReceiver extends SocketMessage {
     }
 
     public void readMessage() throws IOException {
-        char delimiter = config.messageDelimiter();
-        List<Character> responses = new ArrayList<>();
-        int steamChar;
-        while ((steamChar = in.read()) != delimiter && !Thread.currentThread().isInterrupted()) {
-            if (steamChar == -1) {
-                log.warn("BotId: {}, Unexpected end of stream", botId);
+        final char delimiter = config.messageDelimiter();
+        List<Character> response = new ArrayList<>();
+        int streamChar;
+        while ((streamChar = in.read()) != delimiter && isSocketActive()) {
+            if (streamChar == -1) {
+                if (!isSocketActive()) {
+                    log.warn("BotId: {}, Unexpected end of stream", botId);
+                }
                 return;
             }
-            responses.add((char) steamChar);
+            response.add((char) streamChar);
         }
-        String string = responses.stream().map(String::valueOf).collect(Collectors.joining());
-        ObjectNode objectNode = (ObjectNode) mapper.readTree(string);
-        List<IpcMessage> ipcMessageList = IpcMessage.fromReceive(objectNode.get("type").asText());
+        if (!isSocketActive()) {
+            if (!response.isEmpty()) {
+                log.warn("BotId: {}, discarding response {}, closed stream", botId, response);
+            }
+            return;
+        }
+        String responseString = response.stream().map(String::valueOf).collect(Collectors.joining());
+        JsonNode jsonNode = mapper.readTree(responseString);
+        if (!jsonNode.isObject()) {
+            log.error("BotId: {}, Unexpected json node", botId);
+            return;
+        }
+        ObjectNode dataNode = (ObjectNode) jsonNode;
+        List<IpcMessage> ipcMessageList = IpcMessage.fromReceive(dataNode.get("type").asText());
         if (ipcMessageList.isEmpty()) {
-            log.warn("BotId: {}, Received a message from client with unknown response type: {}", botId, string);
+            log.warn("BotId: {}, Received a message from client with unknown response type: {}", botId, responseString);
             return;
         }
         for (IpcMessage responseType : ipcMessageList) {
@@ -54,9 +67,9 @@ public class SocketMessageReceiver extends SocketMessage {
                 log.info("BotId: {}, No listeners registered for response: {}", botId, responseType);
                 continue;
             }
-            JsonNode data = objectNode.get("data");
+            JsonNode data = dataNode.get("data");
             if (data == null) {
-                log.warn("BotId: {}, Received a message from client without data: {}", botId, string);
+                log.warn("BotId: {}, Received a message from client without data: {}", botId, responseString);
                 data = NullNode.getInstance();
             }
             switch (responseType) {

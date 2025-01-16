@@ -199,6 +199,11 @@ public class IpcBotHandler implements AutoCloseable {
     @Override
     public void close() throws Exception {
         log.info("Closing {}", this);
+        List<AbstractSocketChannel> socketChannels = List.of(receiver, sender);
+        for (AbstractSocketChannel channel : socketChannels) {
+            log.info("Closing channel {}", channel);
+            channel.close();
+        }
         List<ScheduledExecutorService> services = List.of(receiverExecutor, senderExecutor);
         for (ScheduledExecutorService scheduledExecutorService : services) {
             log.info("Closing scheduled executor service: {}", scheduledExecutorService);
