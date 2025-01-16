@@ -319,7 +319,11 @@ public class BotController {
             return Optional.ofNullable(BotListing.transform(listingNode));
         } catch (IllegalArgumentException e) {
             ctx.status(400);
-            ctx.result(ExceptionUtils.getRootCauseMessage(e));
+            ObjectNode errorNode = mapper.createObjectNode();
+            errorNode.put("success", Boolean.FALSE);
+            errorNode.put("data", ExceptionUtils.getRootCauseMessage(e));
+
+            ctx.json(errorNode.toString());
             return Optional.empty();
         }
     }
