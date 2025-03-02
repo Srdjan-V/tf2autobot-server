@@ -21,6 +21,7 @@ public class JavalinApp implements AutoCloseable {
     private final Auth auth;
     private final BotController botController;
     private final Javalin javalin;
+    private SslPlugin sslPlugin;
 
     public JavalinApp(AutobotIpcServer autobotIpcServer, Config config) {
         this.autobotIpcServer = autobotIpcServer;
@@ -33,7 +34,8 @@ public class JavalinApp implements AutoCloseable {
 
         javalin = Javalin.create(javalinConfig -> {
             if (config.useSsl()) {
-                javalinConfig.registerPlugin(buildSslPlugin(config));
+                sslPlugin = buildSslPlugin(config);
+                javalinConfig.registerPlugin(sslPlugin);
             }
             javalinConfig.router.mount(router -> {
                 router.beforeMatched(auth::handleAccess);

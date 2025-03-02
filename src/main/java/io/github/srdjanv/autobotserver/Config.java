@@ -31,6 +31,9 @@ public class Config implements AutoCloseable {
         fileConfig = FileConfig.builder(configPath, JsonFormat.fancyInstance())
                 .sync()
                 .autoreload()
+                .onAutoReload(()-> {
+                    log.info("Reloading config from {}", configPath);
+                })
                 .build();
         fileConfig.load();
     }
@@ -67,7 +70,7 @@ public class Config implements AutoCloseable {
     }
 
     public boolean sniHostCheck() {
-        return fileConfig.getOrElse("sni_host_check", false);
+        return fileConfig.getOrElse("sni_host_check", true);
     }
 
     public int responseCacheTimeout() {
@@ -92,7 +95,7 @@ public class Config implements AutoCloseable {
 
     public String sslPassword() {
         String ssl_password = fileConfig.get("ssl_password");
-        return Objects.requireNonNull(ssl_password, "No ssl password provided");
+        return ssl_password;
     }
 
     public Path certificate() {

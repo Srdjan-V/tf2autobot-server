@@ -23,6 +23,7 @@ public class Auth {
         if (StringUtils.equals(authToken, config.authToken())) {
             return;
         }
+        log.warn("Access denied. Auth token: {}. Request {}", authToken, ctx.fullUrl());
         throw new UnauthorizedResponse();
     }
 }
