@@ -9,7 +9,6 @@ import lombok.Getter;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.awaitility.Awaitility;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.newsclub.net.unix.AFUNIXSocket;
@@ -107,13 +106,13 @@ public class IpcBotHandler implements AutoCloseable {
         return CompletableFuture.supplyAsync(() -> {
             JsonNode[] data = new JsonNode[1];
             send(message, (node, botHandler) -> {
-                data[0] = node;
+                synchronized (data) {
+                    data[0] = node;
+                    data.notifyAll();
+                }
             }).join();
-            Awaitility.await()
-                    .failFast(() -> closed)
-                    .atMost(Duration.ofSeconds(config.ipcMessageTimeout()))
-                    .until(() -> data[0] != null);
-            return data[0];
+            //join will wait for successful compilation or throw an exception
+            return Objects.requireNonNull(data[0]);
         });
     }
 
@@ -125,18 +124,35 @@ public class IpcBotHandler implements AutoCloseable {
         return CompletableFuture.runAsync(() -> {
             boolean[] finished = new boolean[1];
             OnMessage wrapped = (node, botHandler) -> {
-                try {
-                    onMessage.onMessage(node, botHandler);
-                } finally {
-                    finished[0] = true;
+                synchronized (finished) {
+                    try {
+                        onMessage.onMessage(node, botHandler);
+                    } finally {
+                        finished[0] = true;
+                        finished.notifyAll();
+                    }
                 }
             };
-            try (var ignore = registerListener(new MessageListener(ipcMessage.get(), wrapped))) {
+            try (var ignore = registerListener(ipcMessage.get(), wrapped)) {
                 send(message);
-                Awaitility.await()
-                        .failFast(() -> closed)
-                        .atMost(Duration.ofSeconds(config.ipcMessageTimeout()))
-                        .until(() -> finished[0]);
+                synchronized (finished) {
+                    long timeoutMillis = Duration.ofSeconds(config.ipcMessageTimeout()).toMillis();
+                    long remaining = timeoutMillis;
+                    long deadline = System.currentTimeMillis() + timeoutMillis;
+
+                    while (!finished[0] && remaining > 0) {
+                        try {
+                            finished.wait(remaining);
+                            remaining = deadline - System.currentTimeMillis();
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            throw new RuntimeException("Interrupted while waiting for response", e);
+                        }
+                    }
+                    if (!finished[0]) {
+                        throw new RuntimeException(new TimeoutException("Response timed out"));
+                    }
+                }
             }
         });
     }
