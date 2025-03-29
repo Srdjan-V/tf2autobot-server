@@ -31,7 +31,7 @@ public class Config implements AutoCloseable {
         fileConfig = FileConfig.builder(configPath, JsonFormat.fancyInstance())
                 .sync()
                 .autoreload()
-                .onAutoReload(()-> {
+                .onAutoReload(() -> {
                     log.info("Reloading config from {}", configPath);
                 })
                 .build();

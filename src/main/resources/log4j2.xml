@@ -1,21 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Configuration status="WARN">
     <Properties>
-        <Property name="logPath">target/cucumber-logs</Property>
-        <Property name="rollingFileName">cucumber</Property>
+        <Property name="logPath">logs</Property>
+        <Property name="rollingFileName">latest</Property>
     </Properties>
     <Appenders>
         <Console name="console" target="SYSTEM_OUT">
             <PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] [%logger]: %msg%n" />
         </Console>
-        <RollingFile name="rollingFile" fileName="${logPath}/${rollingFileName}.log" filePattern="${logPath}/${rollingFileName}_%d{yyyy-MM-dd}.log">
+        <RollingFile name="rollingFile" fileName="${logPath}/${rollingFileName}.log"
+                     filePattern="${logPath}/%d{yyyy-MM-dd}-%i.log">
             <PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] [%logger]: %msg%n" />
             <Policies>
                 <!-- Causes a rollover if the log file is older than the current JVM's start time -->
                 <OnStartupTriggeringPolicy />
                 <!-- Causes a rollover once the date/time pattern no longer applies to the active file -->
                 <TimeBasedTriggeringPolicy interval="1" modulate="true" />
+                <SizeBasedTriggeringPolicy size="10MB"/>
             </Policies>
+            <DefaultRolloverStrategy max="10">
+                <Delete basePath="${logPath}" maxDepth="10">
+                    <!-- Delete all files older than 60 days -->
+                    <IfLastModified age="60d"/>
+                </Delete>
+            </DefaultRolloverStrategy>
         </RollingFile>
     </Appenders>
     <Loggers>

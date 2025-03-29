@@ -8,20 +8,20 @@ import java.util.List;
 
 @Slf4j
 public class Main {
-	public static void main(String[] args) throws Exception {
-		Config config = new Config();
-		AutobotIpcServer autobotIpcServer = new AutobotIpcServer(config);
-		JavalinApp javalinApp = new JavalinApp(autobotIpcServer, config);
-		autobotIpcServer.start();
-		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-			for (AutoCloseable closeable : List.of(javalinApp, autobotIpcServer, config)) {
+    public static void main(String[] args) throws Exception {
+        Config config = new Config();
+        AutobotIpcServer autobotIpcServer = new AutobotIpcServer(config);
+        JavalinApp javalinApp = new JavalinApp(autobotIpcServer, config);
+        autobotIpcServer.start();
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            for (AutoCloseable closeable : List.of(javalinApp, autobotIpcServer, config)) {
                 try {
-					log.info("Closing {}", closeable);
+                    log.info("Closing {}", closeable);
                     closeable.close();
                 } catch (Exception e) {
                     log.error(e.getMessage(), e);
                 }
             }
-		}));
-	}
+        }));
+    }
 }
