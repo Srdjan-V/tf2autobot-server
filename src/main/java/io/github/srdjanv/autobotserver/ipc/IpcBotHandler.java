@@ -50,8 +50,9 @@ public class IpcBotHandler implements AutoCloseable {
             throw new IOException("Peer closed socket right after connecting");
         }
 
-        int millis = config.ipcMessagePollInterval();
-        log.info("Starting IpcBotHandler poll interval of {} millis", millis);
+        Duration interval = config.ipcMessagePollInterval();
+        long intervalMillis = interval.toMillis();
+        log.info("Starting IpcBotHandler with poll interval of {}", interval);
         receiverExecutor = Executors.newSingleThreadScheduledExecutor();
         receiver = new SocketMessageReceiver(this, config, objectMapper, socket, reciverMap);
         receiverScheduledFuture = receiverExecutor.scheduleAtFixedRate(() -> {
@@ -61,7 +62,7 @@ public class IpcBotHandler implements AutoCloseable {
                 log.error("Error reading message", e);
                 throw new RuntimeException(e);
             }
-        }, 0, millis, TimeUnit.MILLISECONDS);
+        }, 0, intervalMillis, TimeUnit.MILLISECONDS);
 
         senderExecutor = Executors.newSingleThreadScheduledExecutor();
         sender = new SocketMessageSender(this, config, objectMapper, socket, sendDeque);
@@ -72,7 +73,7 @@ public class IpcBotHandler implements AutoCloseable {
                 log.error("Error sending message", e);
                 throw new RuntimeException(e);
             }
-        }, 0, millis, TimeUnit.MILLISECONDS);
+        }, 0, intervalMillis, TimeUnit.MILLISECONDS);
     }
 
     public <T> CompletableFuture<T> awaitParsedResponse(IpcMessage message, ResponseParser<T> parser) {
@@ -133,7 +134,7 @@ public class IpcBotHandler implements AutoCloseable {
             try (var ignore = registerListener(ipcMessage.get(), wrapped)) {
                 send(message);
                 synchronized (finished) {
-                    long timeoutMillis = Duration.ofSeconds(config.ipcMessageTimeout()).toMillis();
+                    long timeoutMillis = config.ipcMessageTimeout().toMillis();
                     long remaining = timeoutMillis;
                     long deadline = System.currentTimeMillis() + timeoutMillis;
 

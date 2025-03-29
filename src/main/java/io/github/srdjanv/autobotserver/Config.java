@@ -10,6 +10,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Objects;
 
 @Slf4j
@@ -42,16 +43,19 @@ public class Config implements AutoCloseable {
         return fileConfig.getOrElse("message_delimiter", '\f');
     }
 
-    public int ipcMessageTimeout() {
-        return fileConfig.getOrElse("ipc_message_timeout", 120);
+    public Duration ipcMessageTimeout() {
+        int seconds = fileConfig.getOrElse("ipc_message_timeout", 120);
+        return Duration.ofSeconds(seconds);
     }
 
-    public int ipcMessagePollInterval() {
-        return fileConfig.getOrElse("ipc_message_poll_interval", 1000);
+    public Duration ipcMessagePollInterval() {
+        int millis = fileConfig.getOrElse("ipc_message_poll_interval", 1000);
+        return Duration.ofMillis(millis);
     }
 
-    public int ipcSocketAutoRestart() {
-        return fileConfig.getOrElse("ipc_socket_auto_restart", 15);
+    public Duration ipcSocketAutoRestart() {
+        int seconds = fileConfig.getOrElse("ipc_socket_auto_restart", 15);
+        return Duration.ofSeconds(seconds);
     }
 
     public String socketPath() {
@@ -73,8 +77,9 @@ public class Config implements AutoCloseable {
         return fileConfig.getOrElse("sni_host_check", true);
     }
 
-    public int responseCacheTimeout() {
-        return fileConfig.getOrElse("response_cache_timeout", 10);
+    public Duration responseCacheTimeout() {
+        int seconds = fileConfig.getOrElse("response_cache_timeout", 10);
+        return Duration.ofSeconds(seconds);
     }
 
     public boolean useAuth() {

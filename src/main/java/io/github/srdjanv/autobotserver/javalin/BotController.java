@@ -35,11 +35,10 @@ public class BotController {
 
     public BotController(AutobotIpcServer server) {
         this.server = server;
-        int timeout = server.getConfig().responseCacheTimeout();
-        Duration duration = Duration.ofSeconds(timeout);
+        Duration timeout = server.getConfig().responseCacheTimeout();
 
         keyPricesCache = Caffeine.newBuilder()
-                .expireAfterWrite(duration)
+                .expireAfterWrite(timeout)
                 .buildAsync((key, executor) -> {
                     Optional<IpcBotHandler> botHandler = server.getBotHandler(key);
                     if (botHandler.isEmpty()) {
@@ -48,7 +47,7 @@ public class BotController {
                     return botHandler.get().awaitResponse(IpcMessage.KeyPrice);
                 });
         priceListCache = Caffeine.newBuilder()
-                .expireAfterWrite(duration)
+                .expireAfterWrite(timeout)
                 .buildAsync((key, executor) -> {
                     Optional<IpcBotHandler> botHandler = server.getBotHandler(key);
                     if (botHandler.isEmpty()) {
@@ -57,7 +56,7 @@ public class BotController {
                     return botHandler.get().awaitResponse(IpcMessage.Pricelist);
                 });
         tradeListCache = Caffeine.newBuilder()
-                .expireAfterWrite(duration)
+                .expireAfterWrite(timeout)
                 .buildAsync((key, executor) -> {
                     Optional<IpcBotHandler> botHandler = server.getBotHandler(key);
                     if (botHandler.isEmpty()) {
@@ -67,7 +66,7 @@ public class BotController {
                 });
 
         inventoryCache = Caffeine.newBuilder()
-                .expireAfterWrite(duration)
+                .expireAfterWrite(timeout)
                 .buildAsync((key, executor) -> {
                     Optional<IpcBotHandler> botHandler = server.getBotHandler(key);
                     if (botHandler.isEmpty()) {
@@ -77,7 +76,7 @@ public class BotController {
                 });
 
         userInventoryCache = Caffeine.newBuilder()
-                .expireAfterWrite(duration)
+                .expireAfterWrite(timeout)
                 .buildAsync((key, executor) -> {
                     Optional<IpcBotHandler> botHandler = server.getBotHandler(key.bot());
                     if (botHandler.isEmpty()) {

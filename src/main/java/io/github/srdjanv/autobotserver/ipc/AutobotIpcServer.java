@@ -17,6 +17,7 @@ import org.newsclub.net.unix.AFUNIXSocketAddress;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.BiConsumer;
@@ -38,14 +39,14 @@ public class AutobotIpcServer implements AutoCloseable {
 
     public void start() {
         log.info("AutobotIpcServer starting...");
-        final int seconds = config.ipcSocketAutoRestart();
+        final Duration schedule = config.ipcSocketAutoRestart();
         socketScheduler.scheduleAtFixedRate(() -> {
             try {
                 listenerForClients();
             } catch (Throwable e) {
-                log.error("AutobotServer socket listener error, retrying in {} seconds", seconds, e);
+                log.error("AutobotServer socket listener error, retrying in {}", schedule, e);
             }
-        }, 2, seconds, TimeUnit.SECONDS);
+        }, 2, schedule.toMillis(), TimeUnit.MILLISECONDS);
     }
 
     private void listenerForClients() throws IOException {
