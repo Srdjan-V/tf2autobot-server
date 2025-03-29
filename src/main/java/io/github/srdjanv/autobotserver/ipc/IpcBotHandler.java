@@ -106,10 +106,7 @@ public class IpcBotHandler implements AutoCloseable {
         return CompletableFuture.supplyAsync(() -> {
             JsonNode[] data = new JsonNode[1];
             send(message, (node, botHandler) -> {
-                synchronized (data) {
-                    data[0] = node;
-                    data.notifyAll();
-                }
+                data[0] = node;
             }).join();
             //join will wait for successful compilation or throw an exception
             return Objects.requireNonNull(data[0]);
@@ -140,7 +137,7 @@ public class IpcBotHandler implements AutoCloseable {
                     long remaining = timeoutMillis;
                     long deadline = System.currentTimeMillis() + timeoutMillis;
 
-                    while (!finished[0] && remaining > 0) {
+                    while (!finished[0] && remaining > 0 && !closed) {
                         try {
                             finished.wait(remaining);
                             remaining = deadline - System.currentTimeMillis();
@@ -148,6 +145,9 @@ public class IpcBotHandler implements AutoCloseable {
                             Thread.currentThread().interrupt();
                             throw new RuntimeException("Interrupted while waiting for response", e);
                         }
+                    }
+                    if (closed) {
+                        throw new RuntimeException("Handler closed");
                     }
                     if (!finished[0]) {
                         throw new RuntimeException(new TimeoutException("Response timed out"));
@@ -226,8 +226,9 @@ public class IpcBotHandler implements AutoCloseable {
             scheduledExecutorService.shutdown();
         }
         for (ScheduledExecutorService service : services) {
-            if (!service.awaitTermination(5, TimeUnit.SECONDS)) {
+            if (!service.awaitTermination(10, TimeUnit.SECONDS)) {
                 log.info("Timed out executing service {}", service);
+                service.shutdownNow();
             }
         }
         log.info("Closing socket");
