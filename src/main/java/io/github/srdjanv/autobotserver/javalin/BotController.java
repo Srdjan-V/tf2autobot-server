@@ -31,6 +31,7 @@ public class BotController {
     private final AsyncLoadingCache<Long, JsonNode> priceListCache;
     private final AsyncLoadingCache<Long, JsonNode> tradeListCache;
     private final AsyncLoadingCache<Long, JsonNode> inventoryCache;
+    private final AsyncLoadingCache<Long, JsonNode> listingDataCache;
     private final AsyncLoadingCache<UserInvReqKey, JsonNode> userInventoryCache;
 
     public BotController(AutobotIpcServer server) {
@@ -63,6 +64,16 @@ public class BotController {
                         return CompletableFuture.failedFuture(new Exception("Bot handler not found"));
                     }
                     return botHandler.get().awaitResponse(IpcMessage.Trades);
+                });
+
+        listingDataCache = Caffeine.newBuilder()
+                .expireAfterWrite(timeout)
+                .buildAsync((key, executor) -> {
+                    Optional<IpcBotHandler> botHandler = server.getBotHandler(key);
+                    if (botHandler.isEmpty()) {
+                        return CompletableFuture.failedFuture(new Exception("Bot handler not found"));
+                    }
+                    return botHandler.get().awaitResponse(IpcMessage.ListingData);
                 });
 
         inventoryCache = Caffeine.newBuilder()
@@ -159,6 +170,13 @@ public class BotController {
     public void getTrades(Context ctx) {
         getBotId(ctx, botId -> {
             CompletableFuture<JsonNode> future = tradeListCache.get(botId);
+            handleResponse(ctx, future);
+        });
+    }
+
+    public void getListingData(Context ctx) {
+        getBotId(ctx, botId -> {
+            CompletableFuture<JsonNode> future = listingDataCache.get(botId);
             handleResponse(ctx, future);
         });
     }

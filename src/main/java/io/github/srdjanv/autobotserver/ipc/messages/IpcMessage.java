@@ -21,6 +21,7 @@ public enum IpcMessage {
     Item_Update("updateItem", "itemUpdated"),
     Item_Add("addItem", "itemAdded"),
     Inventory("getInventory", "inventory"),
+    ListingData("getListingData", "listingData"),
     UserInventory("getUserInventory", "userInventory"),
     Halt("haltBot", "haltStatus"),
     HaltStatus("getHaltStatus", "haltStatus");

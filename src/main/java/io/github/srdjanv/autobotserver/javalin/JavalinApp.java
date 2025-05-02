@@ -57,6 +57,9 @@ public class JavalinApp implements AutoCloseable {
                     path("trades", () -> {
                         get(botController::getTrades);
                     });
+                    path("listing_data", () -> {
+                        get(botController::getListingData);
+                    });
                     path("remove_item", () -> {
                         delete(botController::removeItem);
                     });
